@@ -1,0 +1,350 @@
+@import '../../styles/_variables';
+
+.panel {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  position: relative;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+}
+
+.emptyContent {
+  text-align: center;
+  color: var(--text-secondary);
+
+  h2 {
+    font-size: $text-2xl;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    font-size: $text-base;
+  }
+}
+
+// ============================================
+// HEADER
+// ============================================
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.backButton {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-snap);
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.chatInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: background-color var(--transition-snap);
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.chatAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: $font-semibold;
+  color: white;
+  font-size: $text-lg;
+}
+
+.chatDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+
+  h3 {
+    font-size: $text-base;
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    margin: 0;
+  }
+}
+
+.status {
+  font-size: $text-xs;
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--success);
+  }
+}
+
+.iconButton {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all var(--transition-snap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+}
+
+// ============================================
+// MESSAGES CONTAINER
+// ============================================
+.messagesContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.noMessages {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  p {
+    color: var(--text-secondary);
+    font-size: $text-base;
+  }
+}
+
+.messagesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+// ============================================
+// MESSAGE BUBBLES (WhatsApp-style)
+// ============================================
+.messageWrapper {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+
+  &.sent {
+    align-items: flex-end;
+
+    .messageBubble {
+      background-color: var(--bubble-sent);
+      color: var(--text-sent);
+      border-bottom-right-radius: 2px; // The "tail"
+    }
+  }
+
+  &.received {
+    align-items: flex-start;
+
+    .messageBubble {
+      background-color: var(--bubble-received);
+      color: var(--text-primary);
+      border-bottom-left-radius: 2px; // The "tail"
+    }
+  }
+
+  &.grouped {
+    margin-top: -0.25rem;
+
+    .messageBubble {
+      border-radius: 12px; // Remove tail for grouped messages
+    }
+  }
+}
+
+.senderName {
+  font-size: $text-xs;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+  margin-left: 0.75rem;
+  font-weight: $font-medium;
+}
+
+.messageBubble {
+  max-width: 70%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  word-wrap: break-word;
+  animation: scaleIn 0.15s ease-out;
+
+  @media (max-width: $breakpoint-md) {
+    max-width: 85%;
+  }
+}
+
+.messageText {
+  margin: 0;
+  font-size: $text-base;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.messageTime {
+  font-size: $text-xs;
+  color: var(--text-secondary);
+  align-self: flex-end;
+  margin-top: 0.25rem;
+  opacity: 0.7;
+}
+
+// ============================================
+// INPUT AREA (Floating Pill Design)
+// ============================================
+.inputContainer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+}
+
+.attachButton,
+.emojiButton {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all var(--transition-snap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+}
+
+.messageInput {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 24px;
+  color: var(--text-primary);
+  font-size: $text-base;
+  font-family: inherit;
+  resize: none;
+  max-height: 120px;
+  overflow-y: auto;
+  transition: all var(--transition-snap);
+
+  &::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-medium);
+    border-radius: 4px;
+  }
+}
+
+.sendButton {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-snap);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

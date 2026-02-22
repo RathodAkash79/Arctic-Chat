@@ -1,0 +1,62 @@
+// ============================================
+// ARCTIC CHAT - SCSS VARIABLES & CONFIGURATION
+// ============================================
+// NOTE: CSS Custom Properties (colors, shadows) are defined in globals.scss
+// This file contains only SCSS variables and mixins for use in .module.scss files
+
+// ============================================
+// RESPONSIVE BREAKPOINTS (SCSS Mixins)
+// ============================================
+$breakpoint-sm: 640px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+$breakpoint-2xl: 1536px;
+
+@mixin sm {
+  @media (min-width: $breakpoint-sm) {
+    @content;
+  }
+}
+
+@mixin md {
+  @media (min-width: $breakpoint-md) {
+    @content;
+  }
+}
+
+@mixin lg {
+  @media (min-width: $breakpoint-lg) {
+    @content;
+  }
+}
+
+@mixin xl {
+  @media (min-width: $breakpoint-xl) {
+    @content;
+  }
+}
+
+// ============================================
+// PANEL DIMENSIONS
+// ============================================
+$panel-left-width: 300px;
+$panel-left-width-tablet: 280px;
+$panel-right-width: 350px;
+
+// ============================================
+// TYPOGRAPHY SCALE
+// ============================================
+$text-xs: 0.75rem; // 12px
+$text-sm: 0.875rem; // 14px
+$text-base: 1rem; // 16px
+$text-lg: 1.125rem; // 18px
+$text-xl: 1.25rem; // 20px
+$text-2xl: 1.5rem; // 24px
+$text-3xl: 1.875rem; // 30px
+
+// Font weights
+$font-regular: 400;
+$font-medium: 500;
+$font-semibold: 600;
+$font-bold: 700;

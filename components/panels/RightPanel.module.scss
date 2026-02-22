@@ -1,0 +1,294 @@
+@import '../../styles/_variables';
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-overlay);
+  backdrop-filter: blur(4px);
+  z-index: 49;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.panel {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-light);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @include lg {
+    width: $panel-right-width;
+  }
+
+  // Tablet: Absolute positioned slide-over with glassmorphism
+  @media (min-width: $breakpoint-md) and (max-width: ($breakpoint-lg - 1px)) {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 350px;
+    z-index: 50;
+    background: rgba(var(--bg-secondary), 0.95);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-xl);
+  }
+
+  // Mobile: Full-screen slide-over
+  @media (max-width: ($breakpoint-md - 1px)) {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 50;
+    box-shadow: var(--shadow-xl);
+  }
+}
+
+// ============================================
+// HEADER
+// ============================================
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-secondary);
+  z-index: 10;
+
+  h3 {
+    font-size: $text-lg;
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    margin: 0;
+  }
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all var(--transition-snap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+}
+
+// ============================================
+// CHAT PROFILE
+// ============================================
+.chatProfile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.chatAvatarLarge {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-lg);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: $font-bold;
+  color: white;
+  font-size: 2.5rem;
+}
+
+.chatName {
+  font-size: $text-2xl;
+  font-weight: $font-semibold;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.chatDescription {
+  font-size: $text-sm;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+// ============================================
+// SECTIONS
+// ============================================
+.section {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-light);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+
+  h4 {
+    font-size: $text-base;
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    margin: 0;
+  }
+}
+
+// ============================================
+// MEMBERS LIST
+// ============================================
+.membersList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.memberItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  transition: background-color var(--transition-snap);
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.memberAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: $font-semibold;
+  color: white;
+  flex-shrink: 0;
+}
+
+.memberInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.memberName {
+  font-size: $text-sm;
+  font-weight: $font-medium;
+  color: var(--text-primary);
+}
+
+.memberRole {
+  font-size: $text-xs;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+// ============================================
+// MEDIA GALLERY
+// ============================================
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.emptyMedia,
+.emptyLinks,
+.emptyFiles {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: $text-sm;
+  background-color: var(--bg-hover);
+  border-radius: 8px;
+  grid-column: 1 / -1;
+
+  p {
+    margin: 0;
+  }
+}
+
+// ============================================
+// LINKS LIST
+// ============================================
+.linksList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+// ============================================
+// FILES LIST
+// ============================================
+.filesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+// ============================================
+// STORAGE INFO
+// ============================================
+.storageInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--bg-hover);
+  border-radius: 8px;
+}
+
+.storageLabel {
+  font-size: $text-sm;
+  color: var(--text-secondary);
+  font-weight: $font-medium;
+}
+
+.storageValue {
+  font-size: $text-base;
+  color: var(--text-primary);
+  font-weight: $font-semibold;
+  font-family: 'JetBrains Mono', monospace;
+}

@@ -1,0 +1,95 @@
+@import '../styles/_variables';
+
+.main {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background-color: var(--bg-primary);
+  overflow: hidden;
+  position: relative;
+}
+
+// ============================================
+// THREE PANEL LAYOUT (RESPONSIVE)
+// ============================================
+
+// LEFT PANEL (Sidebar)
+.leftPanel {
+  height: 100%;
+  flex-shrink: 0;
+  z-index: 1;
+
+  // Mobile: Full width, hide when chat is open
+  @media (max-width: ($breakpoint-md - 1px)) {
+    width: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    transition: transform var(--transition-panel);
+
+    &.hidden {
+      transform: translateX(-100%);
+    }
+  }
+
+  // Tablet & Desktop: Fixed width
+  @include md {
+    width: $panel-left-width-tablet;
+    position: relative;
+  }
+
+  @include lg {
+    width: $panel-left-width;
+  }
+}
+
+// MIDDLE PANEL (Chat)
+.middlePanel {
+  flex: 1;
+  height: 100%;
+  position: relative;
+
+  // Mobile: Full width, slide in from right when chat opens
+  @media (max-width: ($breakpoint-md - 1px)) {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(100%);
+    transition: transform var(--transition-panel);
+    z-index: 2;
+
+    &.visible {
+      transform: translateX(0);
+    }
+  }
+
+  // Tablet & Desktop: Normal flex layout
+  @include md {
+    transform: none !important;
+    position: relative;
+  }
+}
+
+// RIGHT PANEL (Details)
+.rightPanel {
+  height: 100%;
+  flex-shrink: 0;
+
+  // Mobile & Tablet: Handled by component's own positioning
+  @media (max-width: ($breakpoint-lg - 1px)) {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+  }
+
+  // Desktop: Normal flex layout
+  @include lg {
+    width: $panel-right-width;
+    position: relative;
+  }
+}

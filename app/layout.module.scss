@@ -1,0 +1,13 @@
+@import '../styles/_variables';
+
+.container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  background-color: var(--bg-primary);
+  overflow: hidden;
+
+  &.modal-open {
+    overflow: hidden;
+  }
+}

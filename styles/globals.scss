@@ -1,0 +1,293 @@
+// ============================================
+// GLOBAL DESIGN TOKENS (CSS Custom Properties)
+// ============================================
+
+// Light Theme (Default)
+:root {
+  // ---- BACKGROUNDS ----
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+
+  // ---- TEXT ----
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+
+  // ---- ACCENTS ----
+  --accent-primary: #0ea5e9;
+  --accent-hover: #0284c7;
+  --accent-focus: #0c4a6e;
+
+  // ---- MESSAGE BUBBLES ----
+  --bubble-sent: #e0f2fe;
+  --bubble-received: #f1f5f9;
+  --text-sent: #0c4a6e;
+
+  // ---- BORDERS & DIVIDERS ----
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+
+  // ---- STATUS COLORS ----
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  // ---- SHADOWS ----
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+  // ---- TRANSITIONS ----
+  --transition-snap: 0.2s ease;
+  --transition-panel: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-modal: 0.15s ease-out;
+}
+
+// Dark Theme
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #020617;
+  --bg-hover: #1e293b;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  --accent-primary: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-focus: #0284c7;
+
+  --bubble-sent: #0284c7;
+  --bubble-received: #1e293b;
+  --text-sent: #f0f9ff;
+
+  --border-light: #334155;
+  --border-medium: #475569;
+
+  // Status colors remain consistent across themes
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+}
+
+// ============================================
+// GLOBAL RESET & TYPOGRAPHY
+// ============================================
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: $font-regular;
+  line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// ============================================
+// TYPOGRAPHY HIERARCHY
+// ============================================
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: $font-semibold;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  font-size: $text-3xl;
+}
+
+h2 {
+  font-size: $text-2xl;
+}
+
+h3 {
+  font-size: $text-xl;
+}
+
+h4 {
+  font-size: $text-lg;
+}
+
+p {
+  margin-bottom: 1rem;
+}
+
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color var(--transition-snap);
+
+  &:hover {
+    color: var(--accent-hover);
+  }
+}
+
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background-color: var(--bg-secondary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+// ============================================
+// CUSTOM SCROLLBARS (Webkit)
+// ============================================
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+  transition: background var(--transition-snap);
+
+  &:hover {
+    background: var(--accent-primary);
+  }
+}
+
+// ============================================
+// UTILITY CLASSES
+// ============================================
+
+.container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+// ============================================
+// ANIMATIONS
+// ============================================
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+// ============================================
+// RESPONSIVE UTILITIES
+// ============================================
+
+// Hide on mobile
+.hidden-mobile {
+  @media (max-width: ($breakpoint-md - 1px)) {
+    display: none !important;
+  }
+}
+
+// Hide on desktop
+.hidden-desktop {
+  @include md {
+    display: none !important;
+  }
+}
