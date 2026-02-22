@@ -36,16 +36,19 @@ export default function SignupPage() {
     }
 
     try {
-      // Check if email is whitelisted
+      // Check if email is whitelisted (case-insensitive)
+      const emailLower = email.toLowerCase().trim();
+      
       const { data: whitelistData, error: whitelistError } = await supabase
         .from('whitelist')
         .select('email')
-        .eq('email', email.toLowerCase())
+        .ilike('email', emailLower) // Case-insensitive search
         .single();
 
       if (whitelistError || !whitelistData) {
+        console.error('Whitelist check error:', whitelistError);
         setError(
-          'This email is not whitelisted. Please contact an administrator to get access.'
+          `Email "${email}" is not whitelisted. Contact an admin to request access.`
         );
         setLoading(false);
         return;

@@ -81,22 +81,22 @@ WHERE schemaname = 'public';
 -- Test DM creation function
 SELECT create_dm_chat(
   '<user-id-1>'::uuid, 
-  '<user-id-2>'::uuid
-);
-```
+    '<user-id-2>'::uuid
+    );
+    ```
 
-## Role Weights Reference
+    ## Role Weights Reference
 
-| Role         | Weight | Capabilities                          |
-|--------------|--------|---------------------------------------|
-| Management   | 100    | Full admin access                     |
-| Developer    | 80     | Admin panel, whitelist management     |
-| Staff        | 50     | Standard user                         |
-| Trial Staff  | 20     | Limited access                        |
+    | Role         | Weight | Capabilities                          |
+    |--------------|--------|---------------------------------------|
+    | Management   | 100    | Full admin access access           |
+    | Developer    | 80     | Admin panel, whitelist management     |
+    | Staff        | 50     | Standard user                         |
+    | Trial Staff  | 20     | Limited access                        |
 
-## Next Steps
+    ## Next Steps
 
-1. Run migrations in your Supabase project
-2. Create your first admin user via Supabase Auth
-3. Manually set their `role_weight` to 100 in the `users` table
-4. Use the admin panel to add emails to the whitelist
+    1. Run migrations in your Supabase project
+    2. Create your first admin user via Supabase Auth
+    3. Manually set their `role_weight` to 100 in the `users` table
+    4. Use the admin panel to add emails to the whitelist

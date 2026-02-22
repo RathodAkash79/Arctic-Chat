@@ -82,10 +82,28 @@ export default function SetupProfilePage() {
 
       // Upload profile picture if provided
       if (pfpFile) {
-        // TODO: Upload to custom object storage
-        // For now, we'll use a placeholder
-        // In production, call your custom object storage API
-        pfpUrl = pfpPreview; // Temporary: use data URL
+        try {
+          const formData = new FormData();
+          formData.append('file', pfpFile);
+          formData.append('purpose', 'profile');
+
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json();
+            throw new Error(errorData.error || 'Upload failed');
+          }
+
+          const uploadData = await uploadResponse.json();
+          pfpUrl = uploadData.url;
+          console.log('Profile picture uploaded:', pfpUrl);
+        } catch (uploadErr) {
+          console.error('Image upload error:', uploadErr);
+          throw uploadErr; // Fail the entire request if upload fails
+        }
       }
 
       // Get user email from auth
