@@ -33,8 +33,7 @@ INSERT INTO users (
   role,
   role_weight,
   status,
-  created_at,
-  updated_at
+  created_at
 )
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -44,7 +43,6 @@ VALUES (
   'admin',
   100,
   'active',
-  NOW(),
   NOW()
 )
 ON CONFLICT (id) DO NOTHING;
