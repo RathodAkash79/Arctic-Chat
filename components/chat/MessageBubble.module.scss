@@ -63,6 +63,16 @@
 .text {
     font-size: $text-sm;
     white-space: pre-wrap;
+
+    .link {
+        color: inherit;
+        text-decoration: underline;
+        word-break: break-all;
+
+        &:hover {
+            opacity: 0.8;
+        }
+    }
 }
 
 // Media (images)

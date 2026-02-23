@@ -125,48 +125,54 @@ export function useMessages() {
             };
             addMessage(optimisticMsg);
 
-            try {
-                // 3. Encrypt the text (if passphrase set)
-                const encryptedText = text.trim()
-                    ? await encryptMessage(text.trim())
-                    : '';
-
-                // If user hasn't set passphrase but typed text, encryptMessage returns plaintext.
-                // Log a warning in development so we know it's not encrypted if it's plaintext.
-                if (text.trim() && !hasPassphrase()) {
-                    console.warn('Sending message as plaintext because no E2EE passphrase is set!');
+            // 3. Encrypt the text (if passphrase set)
+            // We await this because it's local and very fast
+            let encryptedText = '';
+            if (text.trim()) {
+                try {
+                    encryptedText = await encryptMessage(text.trim());
+                } catch (err) {
+                    console.error('Encryption error:', err);
                 }
-
-                const payload: Record<string, unknown> = {
-                    id: msgId,
-                    chat_id: currentChat.id,
-                    sender_id: currentUser.id,
-                    text: encryptedText || (mediaUrl ? '[Media]' : ''),
-                    created_at: now,
-                };
-
-                if (mediaUrl) {
-                    payload.media_url = mediaUrl;
-                    payload.is_compressed = true;
-                    payload.is_disappearing = isDisappearing || false;
-
-                    if (isDisappearing) {
-                        payload.expires_at = new Date(Date.now() + 86400000).toISOString();
-                    }
-                }
-
-                // 4. Send to Supabase
-                const { error } = await supabase.from('messages').insert(payload);
-
-                if (error) {
-                    console.error('Failed to send message:', error);
-                    // Minimal fallback: could remove optimistic message here if needed
-                }
-            } catch (err) {
-                console.error('Send error:', err);
             }
 
+            if (text.trim() && !hasPassphrase()) {
+                console.warn('Sending message as plaintext because no E2EE passphrase is set!');
+            }
+
+            const payload: Record<string, unknown> = {
+                id: msgId,
+                chat_id: currentChat.id,
+                sender_id: currentUser.id,
+                text: encryptedText || (mediaUrl ? '[Media]' : ''),
+                created_at: now,
+            };
+
+            if (mediaUrl) {
+                payload.media_url = mediaUrl;
+                payload.is_compressed = true;
+                payload.is_disappearing = isDisappearing || false;
+
+                if (isDisappearing) {
+                    payload.expires_at = new Date(Date.now() + 86400000).toISOString();
+                }
+            }
+
+            // UNBLOCK UI IMMEDIATELY
             setSendingMessage(false);
+
+            // 4. Send to Supabase (Fire and forget network request)
+            const sendToDB = async () => {
+                try {
+                    const { error } = await supabase.from('messages').insert(payload);
+                    if (error) {
+                        console.error('Failed to send message:', error);
+                    }
+                } catch (err: any) {
+                    console.error('Send network error:', err);
+                }
+            };
+            sendToDB();
         },
         [currentUser, currentChat, addMessage]
     );

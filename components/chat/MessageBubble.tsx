@@ -62,7 +62,26 @@ export default function MessageBubble({
                         <img src={mediaUrl} alt="" loading="lazy" />
                     </a>
                 )}
-                {hasText && <span className={styles.text}>{message.text}</span>}
+                {hasText && (
+                    <span className={styles.text}>
+                        {message.text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+                            if (part.match(/(https?:\/\/[^\s]+)/)) {
+                                return (
+                                    <a
+                                        key={i}
+                                        href={part}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.link}
+                                    >
+                                        {part}
+                                    </a>
+                                );
+                            }
+                            return <span key={i}>{part}</span>;
+                        })}
+                    </span>
+                )}
                 <span className={styles.meta}>
                     <span className={styles.time}>
                         {formatMsgTime(message.created_at)}
