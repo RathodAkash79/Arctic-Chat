@@ -26,7 +26,7 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'users' | 'whitelist' | 'analytics'>('users');
-    const [storageStats, setStorageStats] = useState<{ chat_id: string; name: string; storage_used_bytes: number }[]>([]);
+    const [storageStats, setStorageStats] = useState<{ id: string; name: string; storage_used_bytes: number }[]>([]);
 
     // Role guard: only role_weight >= 200
     useEffect(() => {
@@ -50,7 +50,7 @@ export default function AdminPage() {
         ]);
         setUsers((usersData || []) as User[]);
         setWhitelist(whiteData || []);
-        setStorageStats((statsData || []) as { chat_id: string; name: string; storage_used_bytes: number }[]);
+        setStorageStats((statsData || []) as { id: string; name: string; storage_used_bytes: number }[]);
         setLoading(false);
     };
 
@@ -262,7 +262,7 @@ export default function AdminPage() {
                                 </p>
                                 <div className={styles.analyticsList}>
                                     {storageStats.map((chat) => (
-                                        <div key={chat.chat_id} className={styles.analyticsRow}>
+                                        <div key={chat.id} className={styles.analyticsRow}>
                                             <span className={styles.chatName}>{chat.name || 'DM Chat'}</span>
                                             <div className={styles.barWrapper}>
                                                 <div
