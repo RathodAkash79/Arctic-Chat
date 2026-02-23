@@ -69,10 +69,10 @@ export async function POST(request: NextRequest) {
       ACL: 'public-read', // Make it publicly accessible
     };
 
-    const result = await s3.upload(params).promise();
+    await s3.upload(params).promise();
 
-    // Generate public URL
-    const publicUrl = `${process.env.OBJECT_STORAGE_API_URL}/${process.env.OBJECT_STORAGE_BUCKET}/${filename}`;
+    // Generate proxy URL (direct S3 URLs return AccessDenied)
+    const publicUrl = `/api/media/${filename}`;
 
     console.log(`File uploaded: ${filename}`);
 

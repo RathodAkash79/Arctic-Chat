@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import type { ChatListItem, ChatParticipant, User } from '@/types';
+import { resolveImageUrl } from '@/lib/utils';
 
 const POLL_INTERVAL = 30_000; // Refresh chat list every 30s (saves realtime quota)
 
@@ -62,7 +63,11 @@ export function useChats() {
             .select('*')
             .in('id', participantUserIds);
 
-        const usersMap = new Map((users || []).map((u) => [u.id, u as User]));
+        const usersMap = new Map((users || []).map((u) => {
+            const user = u as User;
+            user.pfp_url = resolveImageUrl(user.pfp_url);
+            return [user.id, user];
+        }));
 
         // 5. Build ChatListItem array
         const chatList: ChatListItem[] = chatRows.map((chat) => {

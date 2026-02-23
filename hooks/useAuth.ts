@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import type { User } from '@/types';
+import { resolveImageUrl } from '@/lib/utils';
 
 const HEARTBEAT_INTERVAL = 60_000; // Update last_seen every 60s
 
@@ -23,7 +24,9 @@ export function useAuth() {
             .single();
 
         if (error || !data) return null;
-        return data as User;
+        const user = data as User;
+        user.pfp_url = resolveImageUrl(user.pfp_url);
+        return user;
     }, []);
 
     // Update last_seen heartbeat
@@ -31,11 +34,12 @@ export function useAuth() {
         if (heartbeatRef.current) return;
 
         // Immediate update
-        supabase.rpc('update_last_seen').catch(() => { });
+        const doHeartbeat = async () => {
+            try { await supabase.rpc('update_last_seen'); } catch { /* silent */ }
+        };
+        doHeartbeat();
 
-        heartbeatRef.current = setInterval(() => {
-            supabase.rpc('update_last_seen').catch(() => { });
-        }, HEARTBEAT_INTERVAL);
+        heartbeatRef.current = setInterval(doHeartbeat, HEARTBEAT_INTERVAL);
     }, []);
 
     const stopHeartbeat = useCallback(() => {
