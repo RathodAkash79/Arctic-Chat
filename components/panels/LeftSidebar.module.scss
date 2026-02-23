@@ -308,6 +308,55 @@
   &:active {
     transform: scale(0.98);
   }
+
+  &.fabActive {
+    transform: rotate(45deg);
+
+    &:hover {
+      transform: rotate(45deg) scale(1.08);
+    }
+  }
+}
+
+// ============================================
+// FAB MENU
+// ============================================
+
+.fabMenu {
+  position: absolute;
+  bottom: 5rem;
+  right: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 0.375rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  animation: slideUp 0.15s ease;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: $text-sm;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+  }
 }
 
 // ============================================
@@ -318,6 +367,18 @@
   from {
     opacity: 0;
     transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 
   to {

@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import NewChatModal from '@/components/modals/NewChatModal';
+import CreateGroupModal from '@/components/modals/CreateGroupModal';
 import {
   Search,
   Plus,
@@ -12,6 +13,8 @@ import {
   Moon,
   Sun,
   LogOut,
+  MessageSquare,
+  Users,
 } from 'lucide-react';
 import styles from './LeftSidebar.module.scss';
 
@@ -45,8 +48,9 @@ export default function LeftSidebar() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
-  // Filter chats by search
   const filteredChats = useMemo(() => {
     if (!searchQuery.trim()) return chats;
     const q = searchQuery.toLowerCase();
@@ -157,17 +161,42 @@ export default function LeftSidebar() {
         })}
       </div>
 
-      {/* New Chat FAB */}
+      {/* FAB Menu */}
+      {showFabMenu && (
+        <div className={styles.fabMenu}>
+          <button
+            onClick={() => {
+              setShowFabMenu(false);
+              setIsNewChatModalOpen(true);
+            }}
+          >
+            <MessageSquare size={16} />
+            <span>New DM</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowFabMenu(false);
+              setIsCreateGroupOpen(true);
+            }}
+          >
+            <Users size={16} />
+            <span>New Group</span>
+          </button>
+        </div>
+      )}
+
+      {/* FAB */}
       <button
-        className={styles.fab}
-        onClick={() => setIsNewChatModalOpen(true)}
-        title="New chat"
+        className={`${styles.fab} ${showFabMenu ? styles.fabActive : ''}`}
+        onClick={() => setShowFabMenu(!showFabMenu)}
+        title="New conversation"
       >
         <Plus size={24} />
       </button>
 
-      {/* New Chat Modal */}
+      {/* Modals */}
       {isNewChatModalOpen && <NewChatModal />}
+      {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
     </div>
   );
 }

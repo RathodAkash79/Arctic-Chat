@@ -1,19 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import type { User } from '@/types';
 import { resolveImageUrl } from '@/lib/utils';
 
-const HEARTBEAT_INTERVAL = 60_000; // Update last_seen every 60s
-
 export function useAuth() {
     const router = useRouter();
     const { currentUser, setCurrentUser } = useAppStore();
     const [loading, setLoading] = useState(true);
-    const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Fetch user profile from the users table
     const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
@@ -27,26 +24,6 @@ export function useAuth() {
         const user = data as User;
         user.pfp_url = resolveImageUrl(user.pfp_url);
         return user;
-    }, []);
-
-    // Update last_seen heartbeat
-    const startHeartbeat = useCallback(() => {
-        if (heartbeatRef.current) return;
-
-        // Immediate update
-        const doHeartbeat = async () => {
-            try { await supabase.rpc('update_last_seen'); } catch { /* silent */ }
-        };
-        doHeartbeat();
-
-        heartbeatRef.current = setInterval(doHeartbeat, HEARTBEAT_INTERVAL);
-    }, []);
-
-    const stopHeartbeat = useCallback(() => {
-        if (heartbeatRef.current) {
-            clearInterval(heartbeatRef.current);
-            heartbeatRef.current = null;
-        }
     }, []);
 
     // Initialize auth state
@@ -78,7 +55,6 @@ export function useAuth() {
             if (mounted) {
                 setCurrentUser(profile);
                 setLoading(false);
-                startHeartbeat();
             }
         };
 
@@ -89,13 +65,11 @@ export function useAuth() {
             async (event, session) => {
                 if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
-                    stopHeartbeat();
                     router.replace('/auth/login');
                 } else if (event === 'SIGNED_IN' && session?.user) {
                     const profile = await fetchProfile(session.user.id);
                     if (profile && mounted) {
                         setCurrentUser(profile);
-                        startHeartbeat();
                     }
                 }
             }
@@ -104,17 +78,15 @@ export function useAuth() {
         return () => {
             mounted = false;
             subscription.unsubscribe();
-            stopHeartbeat();
         };
-    }, [fetchProfile, router, setCurrentUser, startHeartbeat, stopHeartbeat]);
+    }, [fetchProfile, router, setCurrentUser]);
 
     // Sign out
     const signOut = useCallback(async () => {
-        stopHeartbeat();
         await supabase.auth.signOut();
         setCurrentUser(null);
         router.replace('/auth/login');
-    }, [router, setCurrentUser, stopHeartbeat]);
+    }, [router, setCurrentUser]);
 
     return { currentUser, loading, signOut };
 }

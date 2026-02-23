@@ -54,7 +54,7 @@ export default function NewChatModal() {
             });
 
             if (error) {
-                console.error('Failed to create DM:', error);
+                console.error('Failed to create DM:', error.message, error.details, error.hint);
                 setCreating(false);
                 return;
             }

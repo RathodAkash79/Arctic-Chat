@@ -20,7 +20,12 @@ export function useChats() {
 
     // Fetch all chats the user participates in
     const fetchChats = useCallback(async () => {
-        if (!currentUser) return;
+        if (!currentUser) {
+            console.log('[fetchChats] No currentUser, skipping');
+            return;
+        }
+
+        console.log('[fetchChats] Fetching for user:', currentUser.id);
 
         // 1. Get chat_ids the user is in
         const { data: participantRows, error: pErr } = await supabase
@@ -28,40 +33,48 @@ export function useChats() {
             .select('chat_id')
             .eq('user_id', currentUser.id);
 
+        console.log('[fetchChats] Step 1 - Participant rows:', participantRows?.length, 'Error:', pErr?.message);
+
         if (pErr || !participantRows?.length) {
             setChats([]);
             return;
         }
 
         const chatIds = participantRows.map((p) => p.chat_id);
+        console.log('[fetchChats] Chat IDs:', chatIds);
 
         // 2. Fetch chats
         const { data: chatRows, error: cErr } = await supabase
             .from('chats')
             .select('*')
             .in('id', chatIds)
-            .order('last_message_time', { ascending: false, nullsFirst: false });
+            .order('last_message_time', { ascending: false, nullsFirst: true });
+
+        console.log('[fetchChats] Step 2 - Chat rows:', chatRows?.length, 'Error:', cErr?.message);
 
         if (cErr || !chatRows) {
             setChats([]);
             return;
         }
 
-        // 3. Fetch all participants for these chats (with user info)
-        const { data: allParticipants } = await supabase
-            .from('chat_participants')
-            .select('chat_id, user_id, group_role, joined_at')
-            .in('chat_id', chatIds);
+        // 3. Fetch all participants for these chats via SECURITY DEFINER function
+        //    (Direct query causes RLS infinite recursion — this bypasses it)
+        interface RpcParticipant { chat_id: string; user_id: string; group_role: string; joined_at: string }
+        const { data: allParticipants } = await supabase.rpc('get_my_chat_participants') as { data: RpcParticipant[] | null };
+
+        console.log('[fetchChats] Step 3 - All participants:', allParticipants?.length);
 
         // 4. Fetch user info for all participants
         const participantUserIds = [
-            ...new Set((allParticipants || []).map((p) => p.user_id)),
+            ...new Set((allParticipants || []).map((p: RpcParticipant) => p.user_id)),
         ];
 
         const { data: users } = await supabase
             .from('users')
             .select('*')
             .in('id', participantUserIds);
+
+        console.log('[fetchChats] Step 4 - Users:', users?.length);
 
         const usersMap = new Map((users || []).map((u) => {
             const user = u as User;
@@ -72,9 +85,12 @@ export function useChats() {
         // 5. Build ChatListItem array
         const chatList: ChatListItem[] = chatRows.map((chat) => {
             const participants: ChatParticipant[] = (allParticipants || [])
-                .filter((p) => p.chat_id === chat.id)
-                .map((p) => ({
-                    ...p,
+                .filter((p: RpcParticipant) => p.chat_id === chat.id)
+                .map((p: RpcParticipant) => ({
+                    chat_id: p.chat_id,
+                    user_id: p.user_id,
+                    group_role: p.group_role as ChatParticipant['group_role'],
+                    joined_at: p.joined_at,
                     user: usersMap.get(p.user_id),
                 }));
 
@@ -94,6 +110,7 @@ export function useChats() {
             } as ChatListItem;
         });
 
+        console.log('[fetchChats] Final chat list:', chatList.length);
         setChats(chatList);
     }, [currentUser, setChats]);
 
