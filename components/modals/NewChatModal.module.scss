@@ -140,6 +140,11 @@
     }
 }
 
+.userAvatarWrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .userAvatar {
     width: 42px;
     height: 42px;
@@ -159,6 +164,20 @@
         height: 100%;
         object-fit: cover;
     }
+}
+
+.onlineDot {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+    border: 2px solid var(--bg-primary);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 2px 6px rgba(14, 165, 233, 0.4);
 }
 
 .userInfo {

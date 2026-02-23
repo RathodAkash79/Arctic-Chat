@@ -272,16 +272,16 @@
 
 .onlineDot {
   position: absolute;
-  bottom: 0px;
-  right: 0px;
+  bottom: -2px;
+  right: -2px;
   width: 14px;
   height: 14px;
-  background-color: var(--status-online);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   border: 2px solid var(--bg-primary);
   border-radius: 50%;
   pointer-events: none;
   z-index: 2;
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
 }
 
 .chatInfo {
@@ -335,7 +335,7 @@
   height: 52px;
   border-radius: 16px;
   border: none;
-  background: linear-gradient(135deg, var(--accent-primary), #0284c7);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   color: white;
   cursor: pointer;
   display: flex;

@@ -9,7 +9,7 @@ import type { User } from '@/types';
 import styles from './NewChatModal.module.scss';
 
 export default function NewChatModal() {
-    const { currentUser, setIsNewChatModalOpen } = useAppStore();
+    const { currentUser, setIsNewChatModalOpen, onlineUsers } = useAppStore();
     const { fetchChats, openChat } = useChats();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<User[]>([]);
@@ -125,11 +125,16 @@ export default function NewChatModal() {
                             onClick={() => startDM(user)}
                             disabled={creating}
                         >
-                            <div className={styles.userAvatar}>
-                                {user.pfp_url ? (
-                                    <img src={user.pfp_url} alt="" />
-                                ) : (
-                                    <span>{user.display_name[0]?.toUpperCase()}</span>
+                            <div className={styles.userAvatarWrapper}>
+                                <div className={styles.userAvatar}>
+                                    {user.pfp_url ? (
+                                        <img src={user.pfp_url} alt="" />
+                                    ) : (
+                                        <span>{user.display_name[0]?.toUpperCase()}</span>
+                                    )}
+                                </div>
+                                {onlineUsers.includes(user.id) && (
+                                    <div className={styles.onlineDot} title="Online" />
                                 )}
                             </div>
                             <div className={styles.userInfo}>

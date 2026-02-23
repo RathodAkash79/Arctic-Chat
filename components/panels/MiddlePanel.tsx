@@ -23,6 +23,7 @@ export default function MiddlePanel() {
     setIsRightPanelOpen,
     isRightPanelOpen,
     typingUsers,
+    onlineUsers,
   } = useAppStore();
 
   const {
@@ -85,6 +86,11 @@ export default function MiddlePanel() {
     return currentChat.pfp_url || '';
   }, [currentChat]);
 
+  const isChatOnline = useMemo(() => {
+    if (!currentChat || currentChat.type !== 'dm') return false;
+    return currentChat.dm_user?.id ? onlineUsers.includes(currentChat.dm_user.id) : false;
+  }, [currentChat, onlineUsers]);
+
   // Message grouping: consecutive messages from same sender
   const groupedProps = useMemo(() => {
     return messages.map((msg, i) => {
@@ -145,12 +151,15 @@ export default function MiddlePanel() {
           <ArrowLeft size={20} />
         </button>
 
-        <div className={styles.headerAvatar}>
-          {chatDisplayAvatar ? (
-            <img src={chatDisplayAvatar} alt="" />
-          ) : (
-            <span>{chatDisplayName[0]?.toUpperCase() || '?'}</span>
-          )}
+        <div className={styles.headerAvatarWrapper}>
+          <div className={styles.headerAvatar}>
+            {chatDisplayAvatar ? (
+              <img src={chatDisplayAvatar} alt="" />
+            ) : (
+              <span>{chatDisplayName[0]?.toUpperCase() || '?'}</span>
+            )}
+          </div>
+          {isChatOnline && <div className={styles.onlineDot} title="Online" />}
         </div>
 
         <div className={styles.headerInfo}>
