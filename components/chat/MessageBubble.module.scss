@@ -1,0 +1,80 @@
+@import '../../styles/_variables';
+
+.wrapper {
+    display: flex;
+    padding: 1px 1rem;
+
+    &.own {
+        justify-content: flex-end;
+    }
+
+    &.other {
+        justify-content: flex-start;
+    }
+
+    // Add spacing before a new sender group
+    &.tail {
+        margin-bottom: 0.5rem;
+    }
+}
+
+.bubble {
+    max-width: 65%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    position: relative;
+    word-break: break-word;
+    line-height: 1.45;
+
+    @media (max-width: $breakpoint-md) {
+        max-width: 80%;
+    }
+
+    .own & {
+        background: var(--msg-bubble-sent);
+        color: var(--msg-text-sent);
+        border-bottom-right-radius: 4px;
+    }
+
+    .other & {
+        background: var(--msg-bubble-received);
+        color: var(--msg-text-received);
+        border-bottom-left-radius: 4px;
+    }
+
+    // When it's the tail (last in group), round the bottom again
+    .tail.own & {
+        border-bottom-right-radius: 12px;
+    }
+
+    .tail.other & {
+        border-bottom-left-radius: 12px;
+    }
+}
+
+.senderName {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: $font-semibold;
+    color: var(--accent-primary);
+    margin-bottom: 0.125rem;
+}
+
+.text {
+    font-size: $text-sm;
+    white-space: pre-wrap;
+}
+
+.meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin-top: 0.125rem;
+}
+
+.time {
+    font-size: 0.625rem;
+    opacity: 0.6;
+    white-space: nowrap;
+}

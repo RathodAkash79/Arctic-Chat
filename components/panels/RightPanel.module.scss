@@ -1,114 +1,81 @@
 @import '../../styles/_variables';
 
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--bg-overlay);
-  backdrop-filter: blur(4px);
-  z-index: 49;
-  animation: fadeIn 0.2s ease-out;
-}
-
 .panel {
   width: 100%;
   height: 100%;
-  background-color: var(--bg-secondary);
-  border-left: 1px solid var(--border-light);
-  overflow-y: auto;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
-  animation: slideInRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow-y: auto;
 
-  @include lg {
+  @media (max-width: ($breakpoint-lg - 1px)) {
     width: $panel-right-width;
-  }
-
-  // Tablet: Absolute positioned slide-over with glassmorphism
-  @media (min-width: $breakpoint-md) and (max-width: ($breakpoint-lg - 1px)) {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 350px;
-    z-index: 50;
-    background: rgba(var(--bg-secondary), 0.95);
-    backdrop-filter: blur(12px);
-    box-shadow: var(--shadow-xl);
-  }
-
-  // Mobile: Full-screen slide-over
-  @media (max-width: ($breakpoint-md - 1px)) {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    z-index: 50;
-    box-shadow: var(--shadow-xl);
+    max-width: 85vw;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
   }
 }
 
-// ============================================
-// HEADER
-// ============================================
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  border-bottom: 1px solid var(--border-light);
-  position: sticky;
-  top: 0;
-  background-color: var(--bg-secondary);
-  z-index: 10;
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
 
   h3 {
-    font-size: $text-lg;
+    font-size: $text-base;
     font-weight: $font-semibold;
     color: var(--text-primary);
     margin: 0;
   }
 }
 
-.closeButton {
-  background: transparent;
+.closeBtn {
+  width: 32px;
+  height: 32px;
   border: none;
+  background: transparent;
+  border-radius: 8px;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 8px;
-  transition: all var(--transition-snap);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 
   &:hover {
-    background-color: var(--bg-hover);
+    background: var(--bg-hover);
     color: var(--text-primary);
   }
 }
 
 // ============================================
-// CHAT PROFILE
+// PROFILE SECTION
 // ============================================
-.chatProfile {
+
+.profile {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 2rem 1rem;
-  text-align: center;
+  border-bottom: 1px solid var(--border-default);
 }
 
-.chatAvatarLarge {
-  width: 100px;
-  height: 100px;
+.avatar {
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.3), rgba(2, 132, 199, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  margin-bottom: 1rem;
-  box-shadow: var(--shadow-lg);
+  color: var(--accent-primary);
+  font-weight: $font-bold;
+  font-size: $text-xl;
+  margin-bottom: 0.75rem;
 
   img {
     width: 100%;
@@ -117,178 +84,99 @@
   }
 }
 
-.avatarPlaceholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: $font-bold;
-  color: white;
-  font-size: 2.5rem;
-}
-
-.chatName {
-  font-size: $text-2xl;
+.profile h4 {
+  font-size: $text-lg;
   font-weight: $font-semibold;
   color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem;
 }
 
-.chatDescription {
+.description {
   font-size: $text-sm;
   color: var(--text-secondary);
+  text-align: center;
   margin: 0;
-  line-height: 1.5;
 }
 
 // ============================================
 // SECTIONS
 // ============================================
+
 .section {
   padding: 1rem;
-  border-bottom: 1px solid var(--border-light);
-
-  &:last-child {
-    border-bottom: none;
-  }
+  border-bottom: 1px solid var(--border-default);
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
   color: var(--text-secondary);
-
-  h4 {
-    font-size: $text-base;
-    font-weight: $font-semibold;
-    color: var(--text-primary);
-    margin: 0;
-  }
+  font-size: $text-sm;
+  font-weight: $font-medium;
+  margin-bottom: 0.75rem;
 }
 
-// ============================================
-// MEMBERS LIST
-// ============================================
-.membersList {
+.participantList {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
-.memberItem {
+.participantItem {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border-radius: 8px;
-  transition: background-color var(--transition-snap);
+  transition: background 0.15s ease;
 
   &:hover {
-    background-color: var(--bg-hover);
+    background: var(--bg-hover);
   }
 }
 
-.memberAvatar {
-  width: 40px;
-  height: 40px;
+.participantAvatar {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(2, 132, 199, 0.15));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: $font-semibold;
-  color: white;
   flex-shrink: 0;
-}
+  overflow: hidden;
+  color: var(--accent-primary);
+  font-weight: $font-semibold;
+  font-size: 0.75rem;
 
-.memberInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.memberName {
-  font-size: $text-sm;
-  font-weight: $font-medium;
-  color: var(--text-primary);
-}
-
-.memberRole {
-  font-size: $text-xs;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-// ============================================
-// MEDIA GALLERY
-// ============================================
-.mediaGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-}
-
-.emptyMedia,
-.emptyLinks,
-.emptyFiles {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: $text-sm;
-  background-color: var(--bg-hover);
-  border-radius: 8px;
-  grid-column: 1 / -1;
-
-  p {
-    margin: 0;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 }
 
-// ============================================
-// LINKS LIST
-// ============================================
-.linksList {
+.participantInfo {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-// ============================================
-// FILES LIST
-// ============================================
-.filesList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-// ============================================
-// STORAGE INFO
-// ============================================
-.storageInfo {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background-color: var(--bg-hover);
-  border-radius: 8px;
+  gap: 0.5rem;
 }
 
-.storageLabel {
+.participantName {
   font-size: $text-sm;
-  color: var(--text-secondary);
   font-weight: $font-medium;
+  color: var(--text-primary);
 }
 
-.storageValue {
-  font-size: $text-base;
-  color: var(--text-primary);
+.participantRole {
+  font-size: 0.625rem;
   font-weight: $font-semibold;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-primary);
+  background: rgba(14, 165, 233, 0.1);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
