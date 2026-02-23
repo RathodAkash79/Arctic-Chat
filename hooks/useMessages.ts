@@ -94,33 +94,73 @@ export function useMessages() {
 
     // Send a message (text and/or media)
     const sendMessage = useCallback(
-        async (text: string, mediaUrl?: string) => {
+        async (text: string, mediaUrl?: string, isDisappearing?: boolean) => {
             if (!currentUser || !currentChat) return;
             if (!text.trim() && !mediaUrl) return;
 
             setSendingMessage(true);
 
+            // 1. Pre-generate UUID for optimistic update & deduplication
+            // Fallback for mobile HTTP testing where crypto.randomUUID is undefined
+            const msgId = typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+
+            const now = new Date().toISOString();
+
+            // 2. Optimistic UI update immediately
+            const optimisticMsg: Message = {
+                id: msgId,
+                chat_id: currentChat.id,
+                sender_id: currentUser.id,
+                text: text || '', // Display plaintext immediately
+                media_url: mediaUrl || undefined,
+                is_compressed: !!mediaUrl,
+                is_disappearing: isDisappearing || false,
+                expires_at: isDisappearing ? new Date(Date.now() + 86400000).toISOString() : undefined,
+                created_at: now,
+            };
+            addMessage(optimisticMsg);
+
             try {
-                // Encrypt the text if passphrase is set
+                // 3. Encrypt the text (if passphrase set)
                 const encryptedText = text.trim()
                     ? await encryptMessage(text.trim())
                     : '';
 
+                // If user hasn't set passphrase but typed text, encryptMessage returns plaintext.
+                // Log a warning in development so we know it's not encrypted if it's plaintext.
+                if (text.trim() && !hasPassphrase()) {
+                    console.warn('Sending message as plaintext because no E2EE passphrase is set!');
+                }
+
                 const payload: Record<string, unknown> = {
+                    id: msgId,
                     chat_id: currentChat.id,
                     sender_id: currentUser.id,
                     text: encryptedText || (mediaUrl ? '[Media]' : ''),
+                    created_at: now,
                 };
 
                 if (mediaUrl) {
                     payload.media_url = mediaUrl;
                     payload.is_compressed = true;
+                    payload.is_disappearing = isDisappearing || false;
+
+                    if (isDisappearing) {
+                        payload.expires_at = new Date(Date.now() + 86400000).toISOString();
+                    }
                 }
 
+                // 4. Send to Supabase
                 const { error } = await supabase.from('messages').insert(payload);
 
                 if (error) {
                     console.error('Failed to send message:', error);
+                    // Minimal fallback: could remove optimistic message here if needed
                 }
             } catch (err) {
                 console.error('Send error:', err);
@@ -128,7 +168,7 @@ export function useMessages() {
 
             setSendingMessage(false);
         },
-        [currentUser, currentChat]
+        [currentUser, currentChat, addMessage]
     );
 
     // Fetch messages when chat changes

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useCallback, KeyboardEvent } from 'react';
-import { Send, Paperclip, X, Sparkles } from 'lucide-react';
+import { Send, Paperclip, X, Sparkles, Clock } from 'lucide-react';
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
 import styles from './MessageInput.module.scss';
 
 interface Props {
-    onSend: (text: string, mediaUrl?: string) => void;
+    onSend: (text: string, mediaUrl?: string, isDisappearing?: boolean) => void;
     disabled?: boolean;
 }
 
@@ -16,6 +16,7 @@ export default function MessageInput({ onSend, disabled }: Props) {
     const [mediaFile, setMediaFile] = useState<Blob | null>(null);
     const [mediaInfo, setMediaInfo] = useState<string>('');
     const [hdMode, setHdMode] = useState(false);
+    const [isDisappearing, setIsDisappearing] = useState(false);
     const [compressing, setCompressing] = useState(false);
     const [uploading, setUploading] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,11 +94,12 @@ export default function MessageInput({ onSend, disabled }: Props) {
             setUploading(false);
         }
 
-        onSend(text, mediaUrl);
+        onSend(text, mediaUrl, isDisappearing);
         setText('');
         setMediaPreview(null);
         setMediaFile(null);
         setMediaInfo('');
+        setIsDisappearing(false);
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
     };
 
@@ -148,15 +150,29 @@ export default function MessageInput({ onSend, disabled }: Props) {
                     <Paperclip size={18} />
                 </button>
 
-                {/* HD Toggle */}
-                <button
-                    className={`${styles.hdBtn} ${hdMode ? styles.hdActive : ''}`}
-                    onClick={() => setHdMode(!hdMode)}
-                    title={hdMode ? 'HD mode on' : 'Standard quality'}
-                >
-                    <Sparkles size={14} />
-                    <span>HD</span>
-                </button>
+                {mediaFile && (
+                    <>
+                        {/* HD Toggle */}
+                        <button
+                            className={`${styles.hdBtn} ${hdMode ? styles.hdActive : ''}`}
+                            onClick={() => setHdMode(!hdMode)}
+                            title={hdMode ? 'HD mode on' : 'Standard quality'}
+                        >
+                            <Sparkles size={14} />
+                            <span>HD</span>
+                        </button>
+
+                        {/* Disappearing Toggle */}
+                        <button
+                            className={`${styles.hdBtn} ${isDisappearing ? styles.hdActive : ''}`}
+                            onClick={() => setIsDisappearing(!isDisappearing)}
+                            title={isDisappearing ? 'View Once (Disappearing)' : 'Keep Media'}
+                        >
+                            <Clock size={14} />
+                            <span>24h</span>
+                        </button>
+                    </>
+                )}
 
                 <input
                     ref={fileInputRef}
