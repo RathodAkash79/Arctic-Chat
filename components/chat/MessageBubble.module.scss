@@ -119,3 +119,169 @@
     opacity: 0.6;
     white-space: nowrap;
 }
+
+.edited {
+    font-size: 0.6rem;
+    opacity: 0.5;
+    font-style: italic;
+}
+
+// ============================================
+// Deleted bubble
+// ============================================
+.deleted {
+    opacity: 0.6;
+    font-style: italic;
+    border: 1px dashed var(--border-light);
+    background: transparent !important;
+}
+
+.deletedText {
+    font-size: $text-sm;
+    color: var(--text-secondary);
+}
+
+// ============================================
+// Context action buttons (Reply, Edit, Delete)
+// ============================================
+.actions {
+    display: none;
+    align-items: center;
+    gap: 0.15rem;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+
+    .wrapper:hover & {
+        display: flex;
+    }
+
+    &.actionsOwn {
+        left: -80px;
+    }
+
+    &.actionsOther {
+        right: -80px;
+    }
+}
+
+.actionBtn {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+
+    &:hover {
+        background: var(--accent-primary);
+        color: #fff;
+    }
+
+    &.danger:hover {
+        background: var(--danger);
+        color: #fff;
+    }
+}
+
+// ============================================
+// Reply Preview inside a bubble
+// ============================================
+.replyPreview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 6px;
+    border-left: 3px solid var(--accent-primary);
+    background: rgba(0, 0, 0, 0.1);
+    margin-bottom: 0.35rem;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.replyAuthor {
+    font-size: 0.7rem;
+    font-weight: $font-semibold;
+    color: var(--accent-primary);
+}
+
+.replyText {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// ============================================
+// Inline Edit Area
+// ============================================
+.editArea {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.editInput {
+    width: 100%;
+    resize: none;
+    border: 1px solid var(--accent-primary);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    font-size: $text-sm;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+    font-family: inherit;
+}
+
+.editActions {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+
+.editSave,
+.editCancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.editSave {
+    background: var(--accent-primary);
+    color: #fff;
+
+    &:hover {
+        background: var(--accent-hover);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.editCancel {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+
+    &:hover {
+        background: var(--danger);
+        color: #fff;
+    }
+}

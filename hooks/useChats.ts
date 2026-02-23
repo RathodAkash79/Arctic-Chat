@@ -6,8 +6,6 @@ import { useAppStore } from '@/store/useAppStore';
 import type { ChatListItem, ChatParticipant, User } from '@/types';
 import { resolveImageUrl } from '@/lib/utils';
 
-const POLL_INTERVAL = 30_000; // Refresh chat list every 30s (saves realtime quota)
-
 export function useChats() {
     const {
         currentUser,
@@ -16,7 +14,6 @@ export function useChats() {
         setCurrentChat,
         updateChatLastMessage,
     } = useAppStore();
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Fetch all chats the user participates in
     const fetchChats = useCallback(async () => {
@@ -114,28 +111,19 @@ export function useChats() {
         setChats(chatList);
     }, [currentUser, setChats]);
 
-    // Start polling
+    // Initial fetch
     useEffect(() => {
         if (!currentUser) return;
-
         fetchChats();
-
-        pollRef.current = setInterval(fetchChats, POLL_INTERVAL);
-
-        return () => {
-            if (pollRef.current) {
-                clearInterval(pollRef.current);
-                pollRef.current = null;
-            }
-        };
     }, [currentUser, fetchChats]);
 
-    // Realtime subscription for new messages (to update chat list preview)
+    // Realtime subscription for new messages and new chats
     useEffect(() => {
         if (!currentUser) return;
 
-        const channel = supabase
-            .channel(`user-chats-${currentUser.id}`)
+        // Listen for chats being updated (e.g., new message triggers last_message update)
+        const chatsChannel = supabase
+            .channel(`user-chats-updates-${currentUser.id}`)
             .on(
                 'postgres_changes',
                 {
@@ -150,12 +138,28 @@ export function useChats() {
                     }
                 }
             )
+            // Listen for user being added to a new chat
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'chat_participants',
+                    filter: `user_id=eq.${currentUser.id}`,
+                },
+                () => {
+                    // Refetch all chats if added to a new one
+                    fetchChats();
+                }
+            )
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(chatsChannel);
         };
-    }, [currentUser, updateChatLastMessage]);
+    }, [currentUser, updateChatLastMessage, fetchChats]);
+
+
 
     // Open a chat
     const openChat = useCallback(

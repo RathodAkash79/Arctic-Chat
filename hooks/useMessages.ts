@@ -97,7 +97,7 @@ export function useMessages() {
 
     // Send a message (text and/or media)
     const sendMessage = useCallback(
-        async (text: string, mediaUrl?: string, isDisappearing?: boolean) => {
+        async (text: string, mediaUrl?: string, replyToId?: string, isDisappearing?: boolean) => {
             if (!currentUser || !currentChat) return;
             if (!text.trim() && !mediaUrl) return;
 
@@ -156,6 +156,7 @@ export function useMessages() {
                 sender_id: currentUser.id,
                 text: encryptedText || (mediaUrl ? '[Media]' : ''),
                 created_at: now,
+                ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
 
             if (mediaUrl) {

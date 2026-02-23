@@ -87,6 +87,12 @@ export default function SetupProfilePage() {
       return;
     }
 
+    if (!pfpFile) {
+      setError('Profile picture is required.');
+      setLoading(false);
+      return;
+    }
+
     try {
       let pfpUrl = '';
 

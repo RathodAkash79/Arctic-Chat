@@ -1,0 +1,426 @@
+@import '../../../styles/_variables';
+
+// ============================================
+// ADMIN PANEL "GOD MODE"
+// ============================================
+
+.page {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    height: 100dvh;
+    background: var(--bg-primary);
+    overflow: hidden;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-light);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow-y: auto;
+}
+
+.adminTitle {
+    font-size: $text-lg;
+    font-weight: $font-bold;
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.navBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: $text-sm;
+    font-weight: $font-medium;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    &.active {
+        background: rgba(14, 165, 233, 0.12);
+        color: var(--accent-primary);
+    }
+}
+
+.stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+.statCard {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.statValue {
+    font-size: $text-xl;
+    font-weight: $font-bold;
+    color: var(--text-primary);
+}
+
+.statLabel {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+// ============================================
+// Content Area
+// ============================================
+
+.content {
+    overflow-y: auto;
+    padding: 1.5rem;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--border-light);
+        border-radius: 4px;
+    }
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sectionTitle {
+    font-size: $text-lg;
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-light);
+}
+
+// ============================================
+// User Management
+// ============================================
+
+.userList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.userCard {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+
+    &.inactive {
+        opacity: 0.6;
+    }
+}
+
+.userAvatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent-primary), #0284c7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: $font-bold;
+    font-size: $text-lg;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.userInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.userName {
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    margin: 0;
+    font-size: $text-sm;
+}
+
+.userEmail {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.statusBadge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: $font-semibold;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    background: var(--danger);
+    color: #fff;
+    text-transform: uppercase;
+    margin-top: 0.2rem;
+}
+
+.userActions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.roleSelect {
+    border: 1px solid var(--border-light);
+    border-radius: 7px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    outline: none;
+}
+
+.actionBtn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+
+    &.ban:hover {
+        background: var(--danger);
+        color: #fff;
+    }
+
+    &.unban:hover {
+        background: var(--success);
+        color: #fff;
+    }
+
+    &:hover {
+        background: var(--warning);
+        color: #fff;
+    }
+}
+
+// ============================================
+// Whitelist
+// ============================================
+
+.addRow {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.emailInput {
+    flex: 1;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: $text-sm;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    outline: none;
+
+    &:focus {
+        border-color: var(--accent-primary);
+    }
+}
+
+.addBtn {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent-primary);
+    color: #fff;
+    font-weight: $font-medium;
+    font-size: $text-sm;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+        background: var(--accent-hover);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.whitelistTable {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.whitelistRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.whitelistEmail {
+    flex: 1;
+    font-size: $text-sm;
+    color: var(--text-primary);
+}
+
+.whitelistDate {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.removeBtn {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: none;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+
+    &:hover {
+        background: var(--danger);
+        color: #fff;
+    }
+}
+
+// ============================================
+// Analytics
+// ============================================
+
+.analyticsNote {
+    font-size: $text-sm;
+    color: var(--text-secondary);
+    margin: -0.5rem 0 0;
+}
+
+.analyticsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.analyticsRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.chatName {
+    width: 140px;
+    flex-shrink: 0;
+    font-size: $text-sm;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.barWrapper {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-hover);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), #0284c7);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.bytes {
+    width: 70px;
+    text-align: right;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+// ============================================
+// Loading state
+// ============================================
+
+.loadingState {
+    display: flex;
+    justify-content: center;
+    padding: 3rem;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border-light);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+}

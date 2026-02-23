@@ -297,3 +297,71 @@
     transform: scale(1);
   }
 }
+
+// ============================================
+// REPLY BAR (above input box)
+// ============================================
+.replyBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  border-left: 3px solid var(--accent-primary);
+  animation: fadeIn 0.15s ease;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.replyBarContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: hidden;
+}
+
+.replyBarLabel {
+  font-size: 0.7rem;
+  font-weight: $font-semibold;
+  color: var(--accent-primary);
+}
+
+.replyBarText {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.replyBarClose {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--danger);
+    color: #fff;
+  }
+}

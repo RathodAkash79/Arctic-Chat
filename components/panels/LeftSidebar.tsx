@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +16,8 @@ import {
   LogOut,
   MessageSquare,
   Users,
+  Shield,
+  LayoutDashboard,
 } from 'lucide-react';
 import styles from './LeftSidebar.module.scss';
 
@@ -97,6 +100,18 @@ export default function LeftSidebar() {
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
+          {(currentUser?.role_weight ?? 0) >= 20 && (
+            <Link href="/workspace" className={styles.settingsLink}>
+              <LayoutDashboard size={16} />
+              <span>Workspace</span>
+            </Link>
+          )}
+          {(currentUser?.role_weight ?? 0) >= 200 && (
+            <Link href="/admin" className={`${styles.settingsLink} ${styles.adminLink}`}>
+              <Shield size={16} />
+              <span>Admin Panel</span>
+            </Link>
+          )}
           <button onClick={signOut}>
             <LogOut size={16} />
             <span>Sign Out</span>

@@ -5,11 +5,13 @@ import { useAppStore } from '@/store/useAppStore';
 import { useMessages } from '@/hooks/useMessages';
 import MessageBubble from '@/components/chat/MessageBubble';
 import MessageInput from '@/components/chat/MessageInput';
+import type { Message } from '@/types';
 import {
   ArrowLeft,
   Info,
   MessageSquare,
   ChevronDown,
+  X as XIcon,
 } from 'lucide-react';
 import styles from './MiddlePanel.module.scss';
 
@@ -36,6 +38,7 @@ export default function MiddlePanel() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const prevMessageCountRef = useRef(0);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -192,6 +195,7 @@ export default function MiddlePanel() {
             showName={groupedProps[i].showName}
             showTail={groupedProps[i].showTail}
             isGroup={currentChat.type === 'group'}
+            onReply={(msg) => setReplyTo(msg)}
           />
         ))}
 
@@ -220,8 +224,23 @@ export default function MiddlePanel() {
         </div>
       )}
 
+      {/* Reply Preview Bar */}
+      {replyTo && (
+        <div className={styles.replyBar}>
+          <div className={styles.replyBarContent}>
+            <span className={styles.replyBarLabel}>Replying to:</span>
+            <span className={styles.replyBarText}>
+              {replyTo.media_url ? '📷 Photo' : replyTo.text.slice(0, 60) + '...'}
+            </span>
+          </div>
+          <button className={styles.replyBarClose} onClick={() => setReplyTo(null)}>
+            <XIcon size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Message Input */}
-      <MessageInput onSend={sendMessage} onTyping={sendTypingEvent} />
+      <MessageInput onSend={(text, media) => { sendMessage(text, media, replyTo?.id); setReplyTo(null); }} onTyping={sendTypingEvent} />
     </div>
   );
 }

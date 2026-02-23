@@ -78,6 +78,10 @@ export interface Message {
   is_compressed: boolean;
   is_disappearing: boolean;
   expires_at?: string;
+  is_deleted?: boolean;
+  edited_at?: string;
+  reply_to_id?: string;
+  link_preview?: { title?: string; description?: string; image?: string; url?: string } | null;
   created_at: string;
   sender?: User;
 }
