@@ -7,10 +7,11 @@ import styles from './MessageInput.module.scss';
 
 interface Props {
     onSend: (text: string, mediaUrl?: string, isDisappearing?: boolean) => void;
+    onTyping?: (isTyping: boolean) => void;
     disabled?: boolean;
 }
 
-export default function MessageInput({ onSend, disabled }: Props) {
+export default function MessageInput({ onSend, onTyping, disabled }: Props) {
     const [text, setText] = useState('');
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
     const [mediaFile, setMediaFile] = useState<Blob | null>(null);
@@ -21,6 +22,8 @@ export default function MessageInput({ onSend, disabled }: Props) {
     const [uploading, setUploading] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const typingRef = useRef(false);
 
     // Auto-resize textarea
     const adjustHeight = useCallback(() => {
@@ -95,6 +98,14 @@ export default function MessageInput({ onSend, disabled }: Props) {
         }
 
         onSend(text, mediaUrl, isDisappearing);
+
+        // Clear typing status
+        if (onTyping && typingRef.current) {
+            onTyping(false);
+            typingRef.current = false;
+        }
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
         setText('');
         setMediaPreview(null);
         setMediaFile(null);
@@ -123,6 +134,24 @@ export default function MessageInput({ onSend, disabled }: Props) {
     };
 
     const canSend = (text.trim() || mediaFile) && !disabled && !uploading && !compressing;
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setText(e.target.value);
+        adjustHeight();
+
+        // Typing logic
+        if (onTyping) {
+            if (!typingRef.current) {
+                onTyping(true);
+                typingRef.current = true;
+            }
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                onTyping(false);
+                typingRef.current = false;
+            }, 3000); // Stop typing after 3s of inactivity
+        }
+    };
 
     return (
         <div className={styles.inputBar}>
@@ -187,7 +216,7 @@ export default function MessageInput({ onSend, disabled }: Props) {
                     className={styles.textarea}
                     placeholder="Type a message..."
                     value={text}
-                    onChange={(e) => handleChange(e.target.value)}
+                    onChange={handleTextChange}
                     onKeyDown={handleKeyDown}
                     disabled={disabled || uploading}
                     rows={1}

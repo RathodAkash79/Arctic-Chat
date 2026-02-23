@@ -42,6 +42,7 @@ export default function LeftSidebar() {
     currentChat,
     theme,
     toggleTheme,
+    onlineUsers,
     isNewChatModalOpen,
     setIsNewChatModalOpen,
   } = useAppStore();
@@ -131,6 +132,10 @@ export default function LeftSidebar() {
               : chat.name || 'Group';
           const displayAvatar =
             chat.type === 'dm' ? chat.dm_user?.pfp_url : chat.pfp_url;
+          const isOnline =
+            chat.type === 'dm' &&
+            chat.dm_user?.id &&
+            onlineUsers.includes(chat.dm_user.id);
 
           return (
             <button
@@ -138,12 +143,15 @@ export default function LeftSidebar() {
               className={`${styles.chatItem} ${isActive ? styles.active : ''}`}
               onClick={() => openChat(chat)}
             >
-              <div className={styles.chatAvatar}>
-                {displayAvatar ? (
-                  <img src={displayAvatar} alt="" />
-                ) : (
-                  <span>{displayName[0]?.toUpperCase() || '?'}</span>
-                )}
+              <div className={styles.chatAvatarWrapper}>
+                <div className={styles.chatAvatar}>
+                  {displayAvatar ? (
+                    <img src={displayAvatar} alt="" />
+                  ) : (
+                    <span>{displayName[0]?.toUpperCase() || '?'}</span>
+                  )}
+                </div>
+                {isOnline && <div className={styles.onlineDot} title="Online" />}
               </div>
               <div className={styles.chatInfo}>
                 <div className={styles.chatTop}>

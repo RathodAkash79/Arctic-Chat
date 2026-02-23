@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function ChatLayout({
     children,
@@ -8,6 +9,7 @@ export default function ChatLayout({
     children: React.ReactNode;
 }) {
     const { currentUser, loading } = useAuth();
+    usePresence();
 
     // Show nothing while checking auth (useAuth handles redirects)
     if (loading || !currentUser) {
@@ -15,7 +17,7 @@ export default function ChatLayout({
             <div
                 style={{
                     width: '100vw',
-                    height: '100vh',
+                    height: '100dvh',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

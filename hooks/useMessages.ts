@@ -16,12 +16,15 @@ export function useMessages() {
         setMessages,
         addMessage,
         prependMessages,
+        setTypingUsers,
+        updateChatLastMessage,
     } = useAppStore();
 
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [sendingMessage, setSendingMessage] = useState(false);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
     // Decrypt a batch of messages
     const decryptBatch = useCallback(async (msgs: Message[]): Promise<Message[]> => {
@@ -125,6 +128,13 @@ export function useMessages() {
             };
             addMessage(optimisticMsg);
 
+            // Optimistic chat list update
+            updateChatLastMessage(
+                currentChat.id,
+                text || (mediaUrl ? '[Media attached]' : 'New message'),
+                now
+            );
+
             // 3. Encrypt the text (if passphrase set)
             // We await this because it's local and very fast
             let encryptedText = '';
@@ -219,13 +229,53 @@ export function useMessages() {
 
         channelRef.current = channel;
 
+        // Initialize typing broadcast channel
+        if (typingChannelRef.current) {
+            supabase.removeChannel(typingChannelRef.current);
+        }
+
+        let typingUsersList: string[] = [];
+
+        const typingChannel = supabase
+            .channel(`typing-${currentChat.id}`)
+            .on('broadcast', { event: 'typing' }, (payload) => {
+                const { user_id, is_typing } = payload.payload;
+                if (is_typing) {
+                    if (!typingUsersList.includes(user_id)) {
+                        typingUsersList = [...typingUsersList, user_id];
+                    }
+                } else {
+                    typingUsersList = typingUsersList.filter(id => id !== user_id);
+                }
+                setTypingUsers(currentChat.id, typingUsersList);
+            })
+            .subscribe();
+
+        typingChannelRef.current = typingChannel;
+
         return () => {
             if (channelRef.current) {
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
             }
+            if (typingChannelRef.current) {
+                supabase.removeChannel(typingChannelRef.current);
+                typingChannelRef.current = null;
+            }
+            // Clear typing state on unmount
+            setTypingUsers(currentChat.id, []);
         };
-    }, [currentChat?.id, addMessage]);
+    }, [currentChat?.id, addMessage, setTypingUsers]);
+
+    // Expose a function to broadcast typing state
+    const sendTypingEvent = useCallback(async (isTyping: boolean) => {
+        if (!typingChannelRef.current || !currentUser) return;
+        await typingChannelRef.current.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { user_id: currentUser.id, is_typing: isTyping }
+        });
+    }, [currentUser]);
 
     return {
         messages,
@@ -234,5 +284,6 @@ export function useMessages() {
         sendingMessage,
         loadMore,
         sendMessage,
+        sendTypingEvent,
     };
 }

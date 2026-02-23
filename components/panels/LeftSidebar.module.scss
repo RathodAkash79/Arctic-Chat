@@ -218,6 +218,11 @@
   }
 }
 
+.chatAvatarWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .chatAvatar {
   width: 48px;
   height: 48px;
@@ -226,7 +231,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   overflow: hidden;
   color: var(--accent-primary);
   font-weight: $font-semibold;
@@ -237,6 +241,20 @@
     height: 100%;
     object-fit: cover;
   }
+}
+
+.onlineDot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 14px;
+  height: 14px;
+  background-color: var(--status-online);
+  border: 2px solid var(--bg-primary);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
 }
 
 .chatInfo {

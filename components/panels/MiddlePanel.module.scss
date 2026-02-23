@@ -239,3 +239,61 @@
     transform: translateY(0);
   }
 }
+
+// ============================================
+// TYPING INDICATOR
+// ============================================
+
+.typingIndicator {
+  position: absolute;
+  bottom: 80px;
+  left: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  animation: fadeIn 0.2s ease-out forwards;
+  z-index: 10;
+}
+
+.typingDots {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 10px;
+
+  span {
+    width: 4px;
+    height: 4px;
+    background-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out both;
+
+    &:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    &:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+  }
+}
+
+@keyframes bounce {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  40% {
+    transform: scale(1);
+  }
+}

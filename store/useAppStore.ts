@@ -33,6 +33,10 @@ interface AppState {
   typingUsers: Record<string, string[]>;
   setTypingUsers: (chatId: string, userIds: string[]) => void;
 
+  // Online Presence
+  onlineUsers: string[];
+  setOnlineUsers: (users: string[]) => void;
+
   // Theme
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -93,6 +97,10 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       typingUsers: { ...state.typingUsers, [chatId]: userIds },
     })),
+
+  // Online Presence
+  onlineUsers: [],
+  setOnlineUsers: (users) => set({ onlineUsers: users }),
 
   // Theme
   theme:

@@ -20,6 +20,7 @@ export default function MiddlePanel() {
     setIsMobileChatOpen,
     setIsRightPanelOpen,
     isRightPanelOpen,
+    typingUsers,
   } = useAppStore();
 
   const {
@@ -27,6 +28,7 @@ export default function MiddlePanel() {
     loadingMessages,
     hasMore,
     sendMessage,
+    sendTypingEvent,
     loadMore,
   } = useMessages();
 
@@ -91,6 +93,21 @@ export default function MiddlePanel() {
       return { isOwn, showName, showTail };
     });
   }, [messages, currentUser?.id]);
+
+  // Derived typing text
+  const typingUserNames = useMemo(() => {
+    if (!currentChat || !typingUsers[currentChat.id]) return [];
+    const ids = typingUsers[currentChat.id].filter(id => id !== currentUser?.id);
+    return ids.map(id => {
+      // For groups, look up participant
+      if (currentChat.type === 'group') {
+        const p = currentChat.participants?.find((p) => p.user_id === id);
+        return p?.user?.display_name || 'Someone';
+      }
+      // For DMs, it's just the dm_user
+      return currentChat.dm_user?.display_name || 'Someone';
+    });
+  }, [currentChat, typingUsers, currentUser]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -188,8 +205,23 @@ export default function MiddlePanel() {
         </button>
       )}
 
+      {/* Typing Indicator */}
+      {typingUserNames.length > 0 && (
+        <div className={styles.typingIndicator}>
+          <div className={styles.typingDots}>
+            <span /><span /><span />
+          </div>
+          <span>
+            {typingUserNames.length <= 2
+              ? typingUserNames.join(' and ')
+              : `${typingUserNames.length} people`}{' '}
+            {typingUserNames.length === 1 ? 'is' : 'are'} typing
+          </span>
+        </div>
+      )}
+
       {/* Message Input */}
-      <MessageInput onSend={sendMessage} />
+      <MessageInput onSend={sendMessage} onTyping={sendTypingEvent} />
     </div>
   );
 }
