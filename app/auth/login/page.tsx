@@ -3,7 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import {
+  Snowflake,
+  Mail,
+  Lock,
+  AlertCircle,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import styles from './login.module.scss';
 import Link from 'next/link';
 
@@ -11,6 +18,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,9 +28,9 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Attempt login with Supabase Auth
+      // Sign in with Supabase Auth
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
@@ -36,38 +44,41 @@ export default function LoginPage() {
         // Check if user profile exists
         const { data: profile, error: profileError } = await supabase
           .from('users')
-          .select('*')
+          .select('id, status, timeout_until')
           .eq('id', data.user.id)
           .single();
 
         if (profileError || !profile) {
-          // Profile doesn't exist, redirect to setup
+          // No profile yet → setup
           router.push('/auth/setup-profile');
-        } else {
-          // Check if user is banned or timed out
-          if (profile.status === 'banned') {
-            setError('Your account has been banned. Contact an administrator.');
+          return;
+        }
+
+        // Check ban status
+        if (profile.status === 'banned') {
+          setError('Your account has been banned. Contact an administrator.');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        // Check timeout status
+        if (profile.status === 'timeout' && profile.timeout_until) {
+          const timeoutDate = new Date(profile.timeout_until);
+          if (timeoutDate > new Date()) {
+            setError(
+              `Your account is timed out until ${timeoutDate.toLocaleString()}.`
+            );
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
-
-          if (profile.status === 'timeout' && profile.timeout_until) {
-            const timeoutDate = new Date(profile.timeout_until);
-            if (timeoutDate > new Date()) {
-              setError(`Your account is timed out until ${timeoutDate.toLocaleString()}`);
-              await supabase.auth.signOut();
-              setLoading(false);
-              return;
-            }
-          }
-
-          // Success! Redirect to main app
-          router.push('/');
         }
+
+        // Success → redirect to main app
+        router.push('/');
       }
-    } catch (err) {
-      console.error('Login error:', err);
+    } catch {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -75,71 +86,95 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <h1>Arctic Chat</h1>
-          <p>Sign in to your account</p>
+    <div className={styles.card}>
+      {/* Branding */}
+      <div className={styles.branding}>
+        <div className={styles.logoIcon}>
+          <Snowflake size={28} strokeWidth={1.5} />
+        </div>
+        <h1 className={styles.title}>
+          <span>Arctic Chat</span>
+        </h1>
+        <p className={styles.subtitle}>Sign in to your account</p>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className={styles.alertError}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Form */}
+      <form onSubmit={handleLogin} className={styles.form}>
+        {/* Email */}
+        <div className={styles.inputGroup}>
+          <label htmlFor="login-email">Email</label>
+          <div className={styles.inputWrapper}>
+            <Mail size={18} className={styles.iconLeft} />
+            <input
+              type="email"
+              id="login-email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="email"
+            />
+          </div>
         </div>
 
-        {error && (
-          <div className={styles.error}>
-            <AlertCircle size={18} />
-            <span>{error}</span>
+        {/* Password */}
+        <div className={styles.inputGroup}>
+          <label htmlFor="login-password">Password</label>
+          <div className={styles.inputWrapper}>
+            <Lock size={18} className={styles.iconLeft} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              id="login-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className={styles.togglePassword}
+              onClick={() => setShowPassword(!showPassword)}
+              tabIndex={-1}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
-        )}
+        </div>
 
-        <form onSubmit={handleLogin} className={styles.form}>
-          <div className={styles.inputGroup}>
-            <label htmlFor="email">Email</label>
-            <div className={styles.inputWrapper}>
-              <Mail size={18} className={styles.icon} />
-              <input
-                type="email"
-                id="email"
-                placeholder="your.email@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <div className={styles.inputGroup}>
-            <label htmlFor="password">Password</label>
-            <div className={styles.inputWrapper}>
-              <Lock size={18} className={styles.icon} />
-              <input
-                type="password"
-                id="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <button 
-            type="submit" 
-            className={styles.submitButton}
-            disabled={loading}
-          >
+        {/* Submit */}
+        <button
+          type="submit"
+          className={styles.submitButton}
+          disabled={loading}
+        >
+          <span className={styles.buttonContent}>
+            {loading && <span className={styles.spinner} />}
             {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+          </span>
+        </button>
+      </form>
 
-        <div className={styles.footer}>
-          <p>
-            Don't have an account?{' '}
-            <Link href="/auth/signup">Sign up</Link>
-          </p>
-          <Link href="/auth/forgot-password" className={styles.forgotLink}>
-            Forgot password?
-          </Link>
-        </div>
+      {/* Footer */}
+      <div className={styles.footer}>
+        <p>
+          Don&apos;t have an account?{' '}
+          <Link href="/auth/signup">Sign up</Link>
+        </p>
+        <Link href="/auth/forgot-password" className={styles.forgotLink}>
+          Forgot password?
+        </Link>
       </div>
     </div>
   );
