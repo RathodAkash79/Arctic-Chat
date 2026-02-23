@@ -2,14 +2,15 @@
 
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { resolveImageUrl } from '@/lib/utils';
 import type { Message } from '@/types';
 import styles from './MessageBubble.module.scss';
 
 interface Props {
     message: Message;
     isOwn: boolean;
-    showTail: boolean; // Last message in a consecutive group from same sender
-    showName: boolean; // First message in group (show sender name in group chats)
+    showTail: boolean;
+    showName: boolean;
     isGroup: boolean;
 }
 
@@ -27,7 +28,6 @@ export default function MessageBubble({
 }: Props) {
     const { currentChat } = useAppStore();
 
-    // Resolve sender name for group chats
     const senderName = useMemo(() => {
         if (!isGroup || isOwn || !showName) return null;
         const participant = currentChat?.participants?.find(
@@ -36,20 +36,40 @@ export default function MessageBubble({
         return participant?.user?.display_name || 'User';
     }, [isGroup, isOwn, showName, currentChat, message.sender_id]);
 
+    const mediaUrl = useMemo(
+        () => (message.media_url ? resolveImageUrl(message.media_url) : null),
+        [message.media_url]
+    );
+
+    const hasText = message.text && message.text !== '[Media]';
+
     return (
         <div
             className={`${styles.wrapper} ${isOwn ? styles.own : styles.other} ${showTail ? styles.tail : ''
                 }`}
         >
-            <div className={styles.bubble}>
+            <div className={`${styles.bubble} ${mediaUrl ? styles.mediaBubble : ''}`}>
                 {senderName && (
                     <span className={styles.senderName}>{senderName}</span>
                 )}
-                <span className={styles.text}>{message.text}</span>
+                {mediaUrl && (
+                    <a
+                        href={mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.mediaImage}
+                    >
+                        <img src={mediaUrl} alt="" loading="lazy" />
+                    </a>
+                )}
+                {hasText && <span className={styles.text}>{message.text}</span>}
                 <span className={styles.meta}>
-                    <span className={styles.time}>{formatMsgTime(message.created_at)}</span>
+                    <span className={styles.time}>
+                        {formatMsgTime(message.created_at)}
+                    </span>
                 </span>
             </div>
         </div>
     );
 }
+

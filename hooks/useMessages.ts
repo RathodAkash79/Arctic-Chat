@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
-import type { Message, User } from '@/types';
+import { encryptMessage, decryptMessage, hasPassphrase } from '@/lib/crypto';
+import type { Message } from '@/types';
 
 const PAGE_SIZE = 30;
 
@@ -21,6 +22,17 @@ export function useMessages() {
     const [hasMore, setHasMore] = useState(true);
     const [sendingMessage, setSendingMessage] = useState(false);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+    // Decrypt a batch of messages
+    const decryptBatch = useCallback(async (msgs: Message[]): Promise<Message[]> => {
+        if (!hasPassphrase()) return msgs;
+        return Promise.all(
+            msgs.map(async (msg) => ({
+                ...msg,
+                text: await decryptMessage(msg.text),
+            }))
+        );
+    }, []);
 
     // Fetch latest messages for current chat
     const fetchMessages = useCallback(
@@ -41,12 +53,13 @@ export function useMessages() {
                 return;
             }
 
-            const msgs = (data || []).reverse(); // oldest first for display
-            setMessages(msgs as Message[]);
-            setHasMore(msgs.length >= PAGE_SIZE);
+            const raw = (data || []).reverse() as Message[];
+            const decrypted = await decryptBatch(raw);
+            setMessages(decrypted);
+            setHasMore(raw.length >= PAGE_SIZE);
             setLoadingMessages(false);
         },
-        [setMessages]
+        [setMessages, decryptBatch]
     );
 
     // Load older messages (pagination)
@@ -58,6 +71,7 @@ export function useMessages() {
 
         setLoadingMessages(true);
 
+        // We need to compare against the original created_at from the database
         const { data, error } = await supabase
             .from('messages')
             .select('*')
@@ -72,26 +86,44 @@ export function useMessages() {
         }
 
         const older = (data || []).reverse() as Message[];
-        prependMessages(older);
+        const decrypted = await decryptBatch(older);
+        prependMessages(decrypted);
         setHasMore(older.length >= PAGE_SIZE);
         setLoadingMessages(false);
-    }, [currentChat, hasMore, loadingMessages, messages, prependMessages]);
+    }, [currentChat, hasMore, loadingMessages, messages, prependMessages, decryptBatch]);
 
-    // Send a message
+    // Send a message (text and/or media)
     const sendMessage = useCallback(
-        async (text: string) => {
-            if (!currentUser || !currentChat || !text.trim()) return;
+        async (text: string, mediaUrl?: string) => {
+            if (!currentUser || !currentChat) return;
+            if (!text.trim() && !mediaUrl) return;
 
             setSendingMessage(true);
 
-            const { error } = await supabase.from('messages').insert({
-                chat_id: currentChat.id,
-                sender_id: currentUser.id,
-                text: text.trim(),
-            });
+            try {
+                // Encrypt the text if passphrase is set
+                const encryptedText = text.trim()
+                    ? await encryptMessage(text.trim())
+                    : '';
 
-            if (error) {
-                console.error('Failed to send message:', error);
+                const payload: Record<string, unknown> = {
+                    chat_id: currentChat.id,
+                    sender_id: currentUser.id,
+                    text: encryptedText || (mediaUrl ? '[Media]' : ''),
+                };
+
+                if (mediaUrl) {
+                    payload.media_url = mediaUrl;
+                    payload.is_compressed = true;
+                }
+
+                const { error } = await supabase.from('messages').insert(payload);
+
+                if (error) {
+                    console.error('Failed to send message:', error);
+                }
+            } catch (err) {
+                console.error('Send error:', err);
             }
 
             setSendingMessage(false);
@@ -128,8 +160,12 @@ export function useMessages() {
                     table: 'messages',
                     filter: `chat_id=eq.${currentChat.id}`,
                 },
-                (payload) => {
+                async (payload) => {
                     const newMsg = payload.new as Message;
+                    // Decrypt the incoming message
+                    if (hasPassphrase()) {
+                        newMsg.text = await decryptMessage(newMsg.text);
+                    }
                     addMessage(newMsg);
                 }
             )
