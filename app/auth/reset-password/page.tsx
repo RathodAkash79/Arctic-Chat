@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
         <div className={styles.card}>
             <div className={styles.branding}>
                 <div className={styles.logoIcon}>
-                    <Snowflake size={28} strokeWidth={1.5} />
+                    <img src="/icon.svg" alt="Arctic Chat Logo" width={32} height={32} />
                 </div>
                 <h1 className={styles.title}>New Password</h1>
                 <p className={styles.subtitle}>Enter and confirm your new password.</p>

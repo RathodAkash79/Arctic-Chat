@@ -128,7 +128,7 @@ export default function MiddlePanel() {
       <div className={styles.panel}>
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>
-            <MessageSquare size={48} strokeWidth={1} />
+            <img src="/icon.svg" width={48} height={48} alt="Arctic Chat" />
           </div>
           <h3>Arctic Chat</h3>
           <p>Select a conversation or start a new one</p>

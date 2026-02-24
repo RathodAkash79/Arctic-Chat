@@ -112,7 +112,7 @@ export default function SignupPage() {
       {/* Branding */}
       <div className={styles.branding}>
         <div className={styles.logoIcon}>
-          <Snowflake size={28} strokeWidth={1.5} />
+          <img src="/icon.svg" alt="Arctic Chat Logo" width={32} height={32} />
         </div>
         <h1 className={styles.title}>
           <span>Arctic Chat</span>
@@ -192,8 +192,8 @@ export default function SignupPage() {
                   <div
                     key={i}
                     className={`${styles.strengthSegment} ${i <= (strength.level === 'weak' ? 1 : strength.level === 'fair' ? 2 : strength.level === 'good' ? 3 : 4)
-                        ? `${styles.active} ${styles[strength.level]}`
-                        : ''
+                      ? `${styles.active} ${styles[strength.level]}`
+                      : ''
                       }`}
                   />
                 ))}
