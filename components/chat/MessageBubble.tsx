@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveImageUrl } from '@/lib/utils';
 import type { Message, MessageEditHistory } from '@/types';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { decryptMessage } from '@/lib/crypto';
 import styles from './MessageBubble.module.scss';
@@ -298,7 +298,7 @@ export default function MessageBubble({
                     </span>
                 )}
 
-                {/* Inline WA Meta data */}
+                {/* Time + Sending indicator */}
                 <span className={styles.metaContainer}>
                     {message.edited_at && (
                         <span
@@ -310,6 +310,11 @@ export default function MessageBubble({
                         </span>
                     )}
                     <span className={styles.time}>{formatMsgTime(message.created_at)}</span>
+                    {message.is_pending && isOwn && (
+                        <span className={styles.pendingIcon} title="Sending...">
+                            <Clock size={10} />
+                        </span>
+                    )}
                 </span>
             </div>
         </div>

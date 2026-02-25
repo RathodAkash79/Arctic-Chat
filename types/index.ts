@@ -101,6 +101,8 @@ export interface Message {
   link_preview?: { title?: string; description?: string; image?: string; url?: string } | null;
   created_at: string;
   sender?: User;
+  // Client-only: true while waiting for DB confirmation (optimistic UI)
+  is_pending?: boolean;
 }
 
 // Task Interface

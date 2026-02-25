@@ -252,6 +252,25 @@
     }
 }
 
+.pendingIcon {
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.5;
+    animation: pendingPulse 1.2s ease-in-out infinite;
+
+    @keyframes pendingPulse {
+
+        0%,
+        100% {
+            opacity: 0.4;
+        }
+
+        50% {
+            opacity: 0.8;
+        }
+    }
+}
+
 // Inline History
 .inlineHistory {
     border-bottom: 1px solid var(--border-light);

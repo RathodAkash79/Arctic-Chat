@@ -96,7 +96,11 @@ export const useAppStore = create<AppState>((set) => {
     setMessages: (messages) => set({ messages }),
     addMessage: (message) =>
       set((state) => {
-        if (state.messages.some((m) => m.id === message.id)) return state;
+        const exists = state.messages.some((m) => m.id === message.id);
+        if (exists) {
+          // Replace optimistic message with confirmed DB row (clears is_pending)
+          return { messages: state.messages.map((m) => m.id === message.id ? message : m) };
+        }
         return { messages: [...state.messages, message] };
       }),
     prependMessages: (older) =>

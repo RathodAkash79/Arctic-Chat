@@ -129,7 +129,7 @@ export function useMessages() {
                 expires_at: isDisappearing ? new Date(Date.now() + 86400000).toISOString() : undefined,
                 mentions: mentions || [],
                 created_at: now,
-                // Include reply_to_id so the sender sees the reply preview immediately
+                is_pending: true,  // show sending indicator
                 ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
             addMessage(optimisticMsg);
@@ -182,6 +182,13 @@ export function useMessages() {
                     const { error } = await supabase.from('messages').insert(payload);
                     if (error) {
                         console.error('Failed to send message:', error.message, error.code, error.details, error.hint);
+                    } else {
+                        // Clear the sending indicator — Realtime may also do this via upsert
+                        useAppStore.setState((s) => ({
+                            messages: s.messages.map((m) =>
+                                m.id === msgId ? { ...m, is_pending: false } : m
+                            ),
+                        }));
                     }
                 } catch (err: unknown) {
                     console.error('Send network error:', err);
