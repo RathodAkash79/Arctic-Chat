@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
@@ -11,6 +11,7 @@ export function useAuth() {
     const router = useRouter();
     const { currentUser, setCurrentUser } = useAppStore();
     const [loading, setLoading] = useState(true);
+    const statusChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
     // Fetch user profile from the users table
     const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
@@ -25,6 +26,45 @@ export function useAuth() {
         user.pfp_url = resolveImageUrl(user.pfp_url);
         return user;
     }, []);
+
+    // Subscribe to realtime status changes — force logout if banned/timed out
+    const subscribeToStatusChanges = useCallback((userId: string) => {
+        if (statusChannelRef.current) {
+            supabase.removeChannel(statusChannelRef.current);
+        }
+
+        statusChannelRef.current = supabase
+            .channel(`user-status-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'users',
+                    filter: `id=eq.${userId}`,
+                },
+                async (payload) => {
+                    const updated = payload.new as { status: string; timeout_until?: string | null };
+                    const isBanned = updated.status === 'banned';
+                    const isActiveTimeout =
+                        updated.status === 'timeout' &&
+                        updated.timeout_until &&
+                        new Date(updated.timeout_until) > new Date();
+
+                    if (isBanned || isActiveTimeout) {
+                        // Force logout immediately
+                        await supabase.auth.signOut();
+                        setCurrentUser(null);
+                        router.replace('/auth/login');
+                    } else {
+                        // Refresh profile in store to reflect updated status
+                        const fresh = await fetchProfile(userId);
+                        if (fresh) setCurrentUser(fresh);
+                    }
+                }
+            )
+            .subscribe();
+    }, [fetchProfile, setCurrentUser, router]);
 
     // Initialize auth state
     useEffect(() => {
@@ -52,8 +92,32 @@ export function useAuth() {
                 return;
             }
 
+            // Check ban/timeout at login time
+            if (profile.status === 'banned') {
+                await supabase.auth.signOut();
+                if (mounted) {
+                    setCurrentUser(null);
+                    setLoading(false);
+                    router.replace('/auth/login');
+                }
+                return;
+            }
+
+            if (profile.status === 'timeout' && profile.timeout_until) {
+                if (new Date(profile.timeout_until) > new Date()) {
+                    await supabase.auth.signOut();
+                    if (mounted) {
+                        setCurrentUser(null);
+                        setLoading(false);
+                        router.replace('/auth/login');
+                    }
+                    return;
+                }
+            }
+
             if (mounted) {
                 setCurrentUser(profile);
+                subscribeToStatusChanges(profile.id);
                 setLoading(false);
             }
         };
@@ -65,11 +129,16 @@ export function useAuth() {
             async (event, session) => {
                 if (event === 'SIGNED_OUT') {
                     setCurrentUser(null);
+                    if (statusChannelRef.current) {
+                        supabase.removeChannel(statusChannelRef.current);
+                        statusChannelRef.current = null;
+                    }
                     router.replace('/auth/login');
                 } else if (event === 'SIGNED_IN' && session?.user) {
                     const profile = await fetchProfile(session.user.id);
                     if (profile && mounted) {
                         setCurrentUser(profile);
+                        subscribeToStatusChanges(profile.id);
                     }
                 }
             }
@@ -78,8 +147,12 @@ export function useAuth() {
         return () => {
             mounted = false;
             subscription.unsubscribe();
+            if (statusChannelRef.current) {
+                supabase.removeChannel(statusChannelRef.current);
+                statusChannelRef.current = null;
+            }
         };
-    }, [fetchProfile, router, setCurrentUser]);
+    }, [fetchProfile, router, setCurrentUser, subscribeToStatusChanges]);
 
     // Sign out
     const signOut = useCallback(async () => {

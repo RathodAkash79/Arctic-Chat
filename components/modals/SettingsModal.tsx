@@ -1,0 +1,309 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useAppStore } from '@/store/useAppStore';
+import { supabase } from '@/lib/supabase';
+import { encryptMessage } from '@/lib/crypto';
+import {
+    X,
+    User,
+    Lock,
+    Palette,
+    MessageSquarePlus,
+    Sun,
+    Moon,
+    Monitor,
+    Check,
+    Loader2,
+} from 'lucide-react';
+import type { Theme } from '@/types';
+import styles from './SettingsModal.module.scss';
+
+type Tab = 'profile' | 'security' | 'appearance' | 'feedback';
+
+export default function SettingsModal() {
+    const { currentUser, setCurrentUser, theme, setTheme, setIsSettingsOpen } = useAppStore();
+    const [activeTab, setActiveTab] = useState<Tab>('profile');
+
+    // Profile tab state
+    const [displayName, setDisplayName] = useState(currentUser?.display_name || '');
+    const [savingName, setSavingName] = useState(false);
+    const [nameSaved, setNameSaved] = useState(false);
+    const [nameError, setNameError] = useState('');
+
+    // Security tab state
+    const [sendingReset, setSendingReset] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
+
+    // Feedback tab state
+    const [feedbackText, setFeedbackText] = useState('');
+    const [sendingFeedback, setSendingFeedback] = useState(false);
+    const [feedbackSent, setFeedbackSent] = useState(false);
+    const [feedbackError, setFeedbackError] = useState('');
+
+    const handleSaveName = useCallback(async () => {
+        if (!displayName.trim() || !currentUser) return;
+        if (displayName.trim() === currentUser.display_name) {
+            setNameSaved(true);
+            setTimeout(() => setNameSaved(false), 2000);
+            return;
+        }
+
+        setSavingName(true);
+        setNameError('');
+
+        const { error } = await supabase
+            .from('users')
+            .update({ display_name: displayName.trim() })
+            .eq('id', currentUser.id);
+
+        setSavingName(false);
+
+        if (error) {
+            setNameError('Failed to update name. Please try again.');
+        } else {
+            setCurrentUser({ ...currentUser, display_name: displayName.trim() });
+            setNameSaved(true);
+            setTimeout(() => setNameSaved(false), 2000);
+        }
+    }, [displayName, currentUser, setCurrentUser]);
+
+    const handlePasswordReset = useCallback(async () => {
+        if (!currentUser?.email) return;
+        setSendingReset(true);
+        await supabase.auth.resetPasswordForEmail(currentUser.email, {
+            redirectTo: `${window.location.origin}/auth/reset-password`,
+        });
+        setSendingReset(false);
+        setResetSent(true);
+    }, [currentUser]);
+
+    const handleFeedback = useCallback(async () => {
+        if (!feedbackText.trim() || !currentUser) return;
+        setSendingFeedback(true);
+        setFeedbackError('');
+
+        try {
+            const encrypted = await encryptMessage(feedbackText.trim());
+            const { error } = await supabase.from('feedback').insert({
+                user_id: currentUser.id,
+                message: encrypted,
+            });
+
+            if (error) throw error;
+            setFeedbackSent(true);
+            setFeedbackText('');
+            setTimeout(() => setFeedbackSent(false), 3000);
+        } catch {
+            setFeedbackError('Failed to submit feedback. Please try again.');
+        } finally {
+            setSendingFeedback(false);
+        }
+    }, [feedbackText, currentUser]);
+
+    const tabs: { id: Tab; icon: React.ReactNode; label: string }[] = [
+        { id: 'profile', icon: <User size={18} />, label: 'Profile' },
+        { id: 'security', icon: <Lock size={18} />, label: 'Security' },
+        { id: 'appearance', icon: <Palette size={18} />, label: 'Appearance' },
+        { id: 'feedback', icon: <MessageSquarePlus size={18} />, label: 'Feedback' },
+    ];
+
+    return (
+        <div className={styles.overlay} onClick={() => setIsSettingsOpen(false)}>
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className={styles.header}>
+                    <h2 className={styles.title}>Settings</h2>
+                    <button
+                        className={styles.closeBtn}
+                        onClick={() => setIsSettingsOpen(false)}
+                        aria-label="Close settings"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className={styles.body}>
+                    {/* Sidebar Tabs */}
+                    <nav className={styles.tabs}>
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
+                                onClick={() => setActiveTab(tab.id)}
+                            >
+                                {tab.icon}
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    {/* Tab Content */}
+                    <div className={styles.content}>
+                        {/* ── PROFILE TAB ── */}
+                        {activeTab === 'profile' && (
+                            <div className={styles.section}>
+                                <h3 className={styles.sectionTitle}>Profile</h3>
+
+                                <div className={styles.field}>
+                                    <label className={styles.label}>Email</label>
+                                    <div className={styles.readonlyField}>
+                                        {currentUser?.email}
+                                    </div>
+                                    <span className={styles.hint}>Email cannot be changed here.</span>
+                                </div>
+
+                                <div className={styles.field}>
+                                    <label className={styles.label} htmlFor="display-name">
+                                        Display Name
+                                    </label>
+                                    <div className={styles.inputRow}>
+                                        <input
+                                            id="display-name"
+                                            type="text"
+                                            className={styles.input}
+                                            value={displayName}
+                                            onChange={(e) => setDisplayName(e.target.value)}
+                                            placeholder="Your display name"
+                                            maxLength={32}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                        />
+                                        <button
+                                            className={`${styles.saveBtn} ${nameSaved ? styles.saveBtnSuccess : ''}`}
+                                            onClick={handleSaveName}
+                                            disabled={savingName || !displayName.trim()}
+                                        >
+                                            {savingName ? (
+                                                <Loader2 size={16} className={styles.spin} />
+                                            ) : nameSaved ? (
+                                                <><Check size={16} /> Saved</>
+                                            ) : (
+                                                'Save'
+                                            )}
+                                        </button>
+                                    </div>
+                                    {nameError && <span className={styles.error}>{nameError}</span>}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SECURITY TAB ── */}
+                        {activeTab === 'security' && (
+                            <div className={styles.section}>
+                                <h3 className={styles.sectionTitle}>Security</h3>
+
+                                <div className={styles.card}>
+                                    <div className={styles.cardInfo}>
+                                        <h4>Password</h4>
+                                        <p>Send a reset link to <strong>{currentUser?.email}</strong>. Click the link in the email to set a new password.</p>
+                                    </div>
+                                    {resetSent ? (
+                                        <div className={styles.successBadge}>
+                                            <Check size={16} /> Reset email sent!
+                                        </div>
+                                    ) : (
+                                        <button
+                                            className={styles.dangerBtn}
+                                            onClick={handlePasswordReset}
+                                            disabled={sendingReset}
+                                        >
+                                            {sendingReset ? (
+                                                <Loader2 size={16} className={styles.spin} />
+                                            ) : (
+                                                'Send Reset Email'
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── APPEARANCE TAB ── */}
+                        {activeTab === 'appearance' && (
+                            <div className={styles.section}>
+                                <h3 className={styles.sectionTitle}>Appearance</h3>
+
+                                <div className={styles.field}>
+                                    <label className={styles.label}>Theme</label>
+                                    <div className={styles.themeOptions}>
+                                        {(
+                                            [
+                                                { value: 'light', icon: <Sun size={20} />, label: 'Light' },
+                                                { value: 'dark', icon: <Moon size={20} />, label: 'Dark' },
+                                                { value: 'system', icon: <Monitor size={20} />, label: 'System' },
+                                            ] as { value: Theme; icon: React.ReactNode; label: string }[]
+                                        ).map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                className={`${styles.themeBtn} ${theme === opt.value ? styles.themeActive : ''}`}
+                                                onClick={() => setTheme(opt.value)}
+                                            >
+                                                {opt.icon}
+                                                <span>{opt.label}</span>
+                                                {theme === opt.value && (
+                                                    <Check size={14} className={styles.themeCheck} />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <span className={styles.hint}>
+                                        &ldquo;System&rdquo; follows your OS dark/light preference.
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── FEEDBACK TAB ── */}
+                        {activeTab === 'feedback' && (
+                            <div className={styles.section}>
+                                <h3 className={styles.sectionTitle}>Feedback & Reports</h3>
+                                <p className={styles.sectionDesc}>
+                                    Report a bug, suggest an improvement, or share any concern. Your message is encrypted before storage.
+                                </p>
+
+                                <div className={styles.field}>
+                                    <label className={styles.label} htmlFor="feedback-text">
+                                        Your message
+                                    </label>
+                                    <textarea
+                                        id="feedback-text"
+                                        className={styles.textarea}
+                                        value={feedbackText}
+                                        onChange={(e) => setFeedbackText(e.target.value)}
+                                        placeholder="Describe your feedback or report..."
+                                        rows={5}
+                                        maxLength={2000}
+                                    />
+                                    <span className={styles.charCount}>
+                                        {feedbackText.length} / 2000
+                                    </span>
+                                </div>
+
+                                {feedbackError && (
+                                    <div className={styles.errorBox}>{feedbackError}</div>
+                                )}
+                                {feedbackSent && (
+                                    <div className={styles.successBox}>
+                                        <Check size={16} /> Thank you! Your feedback has been submitted.
+                                    </div>
+                                )}
+
+                                <button
+                                    className={styles.submitBtn}
+                                    onClick={handleFeedback}
+                                    disabled={sendingFeedback || !feedbackText.trim()}
+                                >
+                                    {sendingFeedback ? (
+                                        <><Loader2 size={16} className={styles.spin} /> Sending...</>
+                                    ) : (
+                                        'Submit Feedback'
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

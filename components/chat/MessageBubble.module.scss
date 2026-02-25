@@ -3,25 +3,26 @@
 .wrapper {
     display: flex;
     padding: 1px 1rem;
+    flex-direction: column;
 
     &.own {
-        justify-content: flex-end;
+        align-items: flex-end;
     }
 
     &.other {
-        justify-content: flex-start;
+        align-items: flex-start;
     }
 
     // Add spacing before a new sender group
     &.tail {
-        margin-bottom: 0.5rem;
+        margin-top: 0.5rem;
     }
 }
 
 .bubble {
     max-width: 65%;
-    padding: 0.5rem 0.75rem;
-    border-radius: 12px;
+    padding: 6px 8px 8px 9px;
+    border-radius: 10px;
     position: relative;
     word-break: break-word;
     line-height: 1.45;
@@ -31,25 +32,132 @@
     }
 
     .own & {
-        background: var(--msg-bubble-sent);
-        color: var(--msg-text-sent);
-        border-bottom-right-radius: 4px;
+        background: var(--bubble-sent);
+        color: var(--text-sent);
+        border-top-right-radius: 2px;
     }
 
     .other & {
-        background: var(--msg-bubble-received);
-        color: var(--msg-text-received);
-        border-bottom-left-radius: 4px;
+        background: var(--bubble-received);
+        color: var(--text-primary);
+        border-top-left-radius: 2px;
     }
 
-    // When it's the tail (last in group), round the bottom again
-    .tail.own & {
-        border-bottom-right-radius: 12px;
+    // Tails — only on the first message of a sender group
+    .tail.own &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: -8px;
+        width: 0;
+        height: 0;
+        border: 6px solid transparent;
+        border-top-color: var(--bubble-sent);
+        border-right: 0;
+        border-bottom: 0;
     }
 
-    .tail.other & {
-        border-bottom-left-radius: 12px;
+    .tail.other &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -8px;
+        width: 0;
+        height: 0;
+        border: 6px solid transparent;
+        border-top-color: var(--bubble-received);
+        border-left: 0;
+        border-bottom: 0;
     }
+
+    // When NOT a tail message, restore full border radius on the "tail" corner
+    .own:not(.tail) & {
+        border-top-right-radius: 10px;
+    }
+
+    .other:not(.tail) & {
+        border-top-left-radius: 10px;
+    }
+}
+
+// ── Dropdown Menu ──
+.dropdownContainer {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    z-index: 10;
+}
+
+.chevronBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    opacity: 0;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s, background 0.2s;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.1);
+        opacity: 1;
+    }
+
+    .bubble:hover & {
+        opacity: 0.7;
+    }
+
+    .bubble:hover &:hover {
+        opacity: 1;
+    }
+}
+
+.dropdownMenu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    min-width: 120px;
+    padding: 0.25rem 0;
+    overflow: hidden;
+
+    button {
+        padding: 0.5rem 1rem;
+        text-align: left;
+        background: none;
+        border: none;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        cursor: pointer;
+
+        &:hover {
+            background: var(--bg-hover);
+        }
+    }
+
+    .dangerItem {
+        color: var(--danger);
+
+        &:hover {
+            color: white;
+            background: var(--danger);
+        }
+    }
+}
+
+// ── Sender row (group chats, other people) ── now INSIDE bubble
+.senderRow {
+    cursor: pointer;
+    margin-bottom: 2px;
 }
 
 .senderName {
@@ -57,7 +165,6 @@
     font-size: 0.75rem;
     font-weight: $font-semibold;
     color: var(--accent-primary);
-    margin-bottom: 0.125rem;
 }
 
 .text {
@@ -73,6 +180,15 @@
             opacity: 0.8;
         }
     }
+}
+
+// @mention token highlighted in blue
+.mention {
+    color: #38bdf8;
+    font-weight: $font-medium;
+    background: rgba(56, 189, 248, 0.12);
+    border-radius: 4px;
+    padding: 0 3px;
 }
 
 // Media (images)
@@ -105,23 +221,59 @@
     }
 }
 
-.meta {
-    display: flex;
+.metaContainer {
+    float: right;
+    display: inline-flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.25rem;
-    margin-top: 0.125rem;
-    padding: 0 0.25rem;
+    gap: 4px;
+    margin-top: 2px;
+    margin-left: 8px;
+    // Push down slightly to align with text baseline
+    transform: translateY(2px);
+    // Clear float after bubble content
+    clear: right;
 }
 
 .time {
-    font-size: 0.625rem;
-    opacity: 0.6;
+    font-size: 0.65rem;
+    opacity: 0.55;
     white-space: nowrap;
 }
 
-.edited {
-    font-size: 0.6rem;
+.editedTag {
+    font-size: 0.65rem;
+    font-style: italic;
+    opacity: 0.55;
+    cursor: pointer;
+
+    &:hover {
+        opacity: 0.9;
+        text-decoration: underline;
+    }
+}
+
+// Inline History
+.inlineHistory {
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+    opacity: 0.6;
+}
+
+.historyEntry {
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+.historyText {
+    margin: 0;
+    color: inherit;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.historyLoading {
+    font-size: 0.75rem;
     opacity: 0.5;
     font-style: italic;
 }
@@ -141,54 +293,7 @@
     color: var(--text-secondary);
 }
 
-// ============================================
-// Context action buttons (Reply, Edit, Delete)
-// ============================================
-.actions {
-    display: none;
-    align-items: center;
-    gap: 0.15rem;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 5;
 
-    .wrapper:hover & {
-        display: flex;
-    }
-
-    &.actionsOwn {
-        left: -80px;
-    }
-
-    &.actionsOther {
-        right: -80px;
-    }
-}
-
-.actionBtn {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    border: none;
-    background: var(--bg-hover);
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-
-    &:hover {
-        background: var(--accent-primary);
-        color: #fff;
-    }
-
-    &.danger:hover {
-        background: var(--danger);
-        color: #fff;
-    }
-}
 
 // ============================================
 // Reply Preview inside a bubble

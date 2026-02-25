@@ -9,7 +9,6 @@ import type { Message } from '@/types';
 import {
   ArrowLeft,
   Info,
-  MessageSquare,
   ChevronDown,
   X as XIcon,
 } from 'lucide-react';
@@ -40,6 +39,8 @@ export default function MiddlePanel() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const prevMessageCountRef = useRef(0);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [replyToDecrypted, setReplyToDecrypted] = useState<string>('');
+  const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -95,10 +96,10 @@ export default function MiddlePanel() {
   const groupedProps = useMemo(() => {
     return messages.map((msg, i) => {
       const prev = messages[i - 1];
-      const next = messages[i + 1];
       const isOwn = msg.sender_id === currentUser?.id;
       const showName = !prev || prev.sender_id !== msg.sender_id;
-      const showTail = !next || next.sender_id !== msg.sender_id;
+      // showTail = first message of a new sender group (where the chat-bubble tail triangle renders)
+      const showTail = showName;
       return { isOwn, showName, showTail };
     });
   }, [messages, currentUser?.id]);
@@ -204,7 +205,14 @@ export default function MiddlePanel() {
             showName={groupedProps[i].showName}
             showTail={groupedProps[i].showTail}
             isGroup={currentChat.type === 'group'}
-            onReply={(msg) => setReplyTo(msg)}
+            onReply={async (msg) => {
+              setReplyTo(msg);
+              // Decrypt the reply text so the bar shows readable text
+              const { decryptMessage } = await import('@/lib/crypto');
+              const plain = await decryptMessage(msg.text).catch(() => msg.text);
+              setReplyToDecrypted(msg.media_url ? '📷 Photo' : plain);
+            }}
+            onEditRequest={(msg, decryptedText) => setEditingMessage({ id: msg.id, text: decryptedText })}
           />
         ))}
 
@@ -239,7 +247,7 @@ export default function MiddlePanel() {
           <div className={styles.replyBarContent}>
             <span className={styles.replyBarLabel}>Replying to:</span>
             <span className={styles.replyBarText}>
-              {replyTo.media_url ? '📷 Photo' : replyTo.text.slice(0, 60) + '...'}
+              {replyTo.media_url ? '📷 Photo' : (replyToDecrypted || replyTo.text).slice(0, 60) + (replyToDecrypted.length > 60 ? '...' : '')}
             </span>
           </div>
           <button className={styles.replyBarClose} onClick={() => setReplyTo(null)}>
@@ -249,7 +257,37 @@ export default function MiddlePanel() {
       )}
 
       {/* Message Input */}
-      <MessageInput onSend={(text, media) => { sendMessage(text, media, replyTo?.id); setReplyTo(null); }} onTyping={sendTypingEvent} />
+      <MessageInput
+        onSend={(text, media, replyToId, isDisappearing, mentions) => {
+          sendMessage(text, media, replyTo?.id || replyToId, isDisappearing, mentions);
+          setReplyTo(null);
+        }}
+        onTyping={sendTypingEvent}
+        chatId={currentChat.id}
+        participants={currentChat.participants || []}
+        callerGroupRole={currentChat.type === 'group' ? currentChat.participants?.find((p) => p.user_id === currentUser?.id)?.group_role : undefined}
+        editingMessage={editingMessage}
+        onEditSave={async (id, newText) => {
+          const { supabase } = await import('@/lib/supabase');
+          const { encryptMessage } = await import('@/lib/crypto');
+          const encrypted = await encryptMessage(newText).catch(() => newText);
+          const { error } = await supabase
+            .from('messages')
+            .update({ text: encrypted, edited_at: new Date().toISOString() })
+            .eq('id', id);
+          if (!error) {
+            useAppStore.setState((s) => ({
+              messages: s.messages.map((m) =>
+                m.id === id ? { ...m, text: encrypted, edited_at: new Date().toISOString() } : m
+              ),
+            }));
+          } else {
+            console.error('Edit failed:', error.message);
+          }
+          setEditingMessage(null);
+        }}
+        onEditCancel={() => setEditingMessage(null)}
+      />
     </div>
   );
 }

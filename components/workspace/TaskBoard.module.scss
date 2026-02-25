@@ -4,11 +4,124 @@
 // TASK BOARD
 // ============================================
 
+.workspaceWrapper {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.sidebar {
+    width: 320px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.sidebarHeader {
+    height: 70px;
+    padding: 0 1.25rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-light);
+
+    h2 {
+        font-size: $text-xl;
+        font-weight: $font-bold;
+        color: var(--text-primary);
+        margin: 0;
+    }
+}
+
+.tierList {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--border-light);
+        border-radius: 4px;
+    }
+}
+
+.tierItem {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.875rem 1.25rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    &.tierActive {
+        background: rgba(14, 165, 233, 0.1);
+        border-left: 3px solid var(--accent-primary);
+    }
+}
+
+.tierAvatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--bg-hover), var(--border-light));
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tierInfo {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    gap: 0.2rem;
+}
+
+.tierName {
+    font-size: $text-base;
+    font-weight: $font-semibold;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tierMeta {
+    font-size: $text-sm;
+    color: var(--text-secondary);
+}
+
+.emptySidebar {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: $text-sm;
+}
+
 .board {
+    flex: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    position: relative;
+    background: var(--bg-primary);
 }
 
 .header {

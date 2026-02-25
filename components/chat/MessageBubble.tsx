@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveImageUrl } from '@/lib/utils';
-import type { Message } from '@/types';
-import { Pencil, Trash2, Reply, X, Check } from 'lucide-react';
+import type { Message, MessageEditHistory } from '@/types';
+import { X, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { encryptMessage, decryptMessage } from '@/lib/crypto';
+import { decryptMessage } from '@/lib/crypto';
 import styles from './MessageBubble.module.scss';
 
 interface Props {
@@ -16,12 +17,15 @@ interface Props {
     showName: boolean;
     isGroup: boolean;
     onReply?: (msg: Message) => void;
+    onEditRequest?: (msg: Message, decryptedText: string) => void;
 }
 
 function formatMsgTime(dateStr: string) {
     const d = new Date(dateStr);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 export default function MessageBubble({
     message,
@@ -30,13 +34,30 @@ export default function MessageBubble({
     showName,
     isGroup,
     onReply,
+    onEditRequest,
 }: Props) {
+    const router = useRouter();
     const { currentChat, currentUser, messages } = useAppStore();
     const [displayText, setDisplayText] = useState<string | null>(null);
     const [replySourceText, setReplySourceText] = useState<string | null>(null);
-    const [editing, setEditing] = useState(false);
-    const [editText, setEditText] = useState('');
-    const [saving, setSaving] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [editHistory, setEditHistory] = useState<MessageEditHistory[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        if (!showDropdown) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDropdown]);
 
     // Decrypt message text on mount
     useEffect(() => {
@@ -66,59 +87,110 @@ export default function MessageBubble({
         [message.media_url]
     );
 
-    const senderName = useMemo(() => {
+    // Sender info for group chats (other people's messages)
+    const senderParticipant = useMemo(() => {
         if (!isGroup || isOwn || !showName) return null;
-        const p = currentChat?.participants?.find((p) => p.user_id === message.sender_id);
-        return p?.user?.display_name || 'User';
+        return currentChat?.participants?.find((p) => p.user_id === message.sender_id) || null;
     }, [isGroup, isOwn, showName, currentChat, message.sender_id]);
 
-    // Can edit within 15 mins of creation
-    const canEdit = useMemo(() => {
-        if (!isOwn || message.is_deleted) return false;
-        return Date.now() - new Date(message.created_at).getTime() < 15 * 60 * 1000;
-    }, [isOwn, message.created_at, message.is_deleted]);
+    const senderName = senderParticipant?.user?.display_name || 'User';
+
+    // 15-minute window check (updated reactively would need a timer, but useMemo is ok for render)
+    const isWithin15Min = useMemo(
+        () => Date.now() - new Date(message.created_at).getTime() < FIFTEEN_MINUTES,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [message.created_at]
+    );
+
+    const canEdit = isOwn && !message.is_deleted && isWithin15Min;
+    const canDelete = isOwn && !message.is_deleted && isWithin15Min;
+
+    // Open DM with sender
+    const handleClickSender = useCallback(async () => {
+        if (!senderParticipant || !currentUser) return;
+        const targetUserId = senderParticipant.user_id;
+        // Try to find existing DM first
+        const { data: existing } = await supabase.rpc('get_or_create_dm_chat', {
+            other_user_id: targetUserId,
+        });
+        if (existing) {
+            router.push('/');
+        }
+    }, [senderParticipant, currentUser, router]);
 
     const handleDelete = useCallback(async () => {
-        await supabase
+        if (!canDelete) return;
+        const { error } = await supabase
             .from('messages')
             .update({ is_deleted: true, text: '[deleted]' })
             .eq('id', message.id);
+        if (error) {
+            console.error('Delete failed:', error.message, error.code, error.hint);
+            return;
+        }
         useAppStore.setState((s) => ({
             messages: s.messages.map((m) =>
                 m.id === message.id ? { ...m, is_deleted: true, text: '[deleted]' } : m
             ),
         }));
-    }, [message.id]);
+    }, [message.id, canDelete]);
 
-    const handleStartEdit = useCallback(() => {
-        setEditText(displayText || '');
-        setEditing(true);
-    }, [displayText]);
 
-    const handleSaveEdit = useCallback(async () => {
-        if (!editText.trim() || saving) return;
-        setSaving(true);
-        const encrypted = await encryptMessage(editText.trim());
-        const { error } = await supabase
-            .from('messages')
-            .update({ text: encrypted, edited_at: new Date().toISOString() })
-            .eq('id', message.id);
-        setSaving(false);
-        if (!error) {
-            useAppStore.setState((s) => ({
-                messages: s.messages.map((m) =>
-                    m.id === message.id
-                        ? { ...m, text: encrypted, edited_at: new Date().toISOString() }
-                        : m
-                ),
-            }));
-            setEditing(false);
+    const handleShowHistory = useCallback(async () => {
+        if (showHistory) { setShowHistory(false); return; }
+        setLoadingHistory(true);
+        const { data } = await supabase
+            .from('message_edit_history')
+            .select('*')
+            .eq('message_id', message.id)
+            .order('edited_at', { ascending: false });
+
+        if (data) {
+            const decrypted = await Promise.all(
+                data.map(async (h) => ({
+                    ...h,
+                    old_text: await decryptMessage(h.old_text).catch(() => h.old_text),
+                }))
+            );
+            setEditHistory(decrypted as MessageEditHistory[]);
         }
-    }, [editText, saving, message.id]);
+        setLoadingHistory(false);
+        setShowHistory(true);
+    }, [showHistory, message.id]);
 
     const handleReply = useCallback(() => {
         onReply?.(message);
     }, [message, onReply]);
+
+    // Render text with @mention highlighting
+    const renderTextWithMentions = useCallback((text: string) => {
+        const mentions = message.mentions || [];
+        if (mentions.length === 0) {
+            // Still parse URLs
+            return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                part.match(/^https?:\/\//) ? (
+                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={styles.link}>{part}</a>
+                ) : <span key={i}>{part}</span>
+            );
+        }
+
+        // Build regex from mention names
+        const names = mentions.map((m) => m.display_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const mentionRegex = new RegExp(`(@(?:${names.join('|')}))`, 'g');
+
+        return text.split(/(https?:\/\/[^\s]+)/g).flatMap((urlPart, ui) => {
+            if (urlPart.match(/^https?:\/\//)) {
+                return [<a key={`u${ui}`} href={urlPart} target="_blank" rel="noopener noreferrer" className={styles.link}>{urlPart}</a>];
+            }
+            return urlPart.split(mentionRegex).map((seg, si) =>
+                mentionRegex.test(seg) ? (
+                    <span key={`m${ui}-${si}`} className={styles.mention}>{seg}</span>
+                ) : (
+                    <span key={`t${ui}-${si}`}>{seg}</span>
+                )
+            );
+        });
+    }, [message.mentions]);
 
     if (message.is_deleted) {
         return (
@@ -133,33 +205,53 @@ export default function MessageBubble({
     return (
         <div
             className={`${styles.wrapper} ${isOwn ? styles.own : styles.other} ${showTail ? styles.tail : ''}`}
+            onDoubleClick={handleReply}
         >
-            {/* Context Action Buttons */}
-            <div className={`${styles.actions} ${isOwn ? styles.actionsOwn : styles.actionsOther}`}>
-                {onReply && (
-                    <button className={styles.actionBtn} onClick={handleReply} title="Reply">
-                        <Reply size={13} />
-                    </button>
-                )}
-                {isOwn && canEdit && (
-                    <button className={styles.actionBtn} onClick={handleStartEdit} title="Edit">
-                        <Pencil size={13} />
-                    </button>
-                )}
-                {isOwn && (
-                    <button
-                        className={`${styles.actionBtn} ${styles.danger}`}
-                        onClick={handleDelete}
-                        title="Delete"
-                    >
-                        <Trash2 size={13} />
-                    </button>
-                )}
-            </div>
-
             <div className={`${styles.bubble} ${mediaUrl ? styles.mediaBubble : ''}`}>
-                {senderName && <span className={styles.senderName}>{senderName}</span>}
+                {/* Sender Name INSIDE bubble (group, other people) */}
+                {senderParticipant && (
+                    <div
+                        className={styles.senderRow}
+                        onClick={handleClickSender}
+                        title={`Open DM with ${senderName}`}
+                    >
+                        <span className={styles.senderName}>{senderName}</span>
+                    </div>
+                )}
 
+                {/* 3-Dots Dropdown Menu */}
+                {(onReply || canEdit || canDelete) && (
+                    <div className={styles.dropdownContainer} ref={dropdownRef}>
+                        <button
+                            className={styles.chevronBtn}
+                            onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
+                        >
+                            <ChevronDown size={14} />
+                        </button>
+                        {showDropdown && (
+                            <div className={styles.dropdownMenu}>
+                                {onReply && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleReply(); }}>
+                                        Reply
+                                    </button>
+                                )}
+                                {canEdit && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); onEditRequest?.(message, displayText || ''); }}>
+                                        Edit
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleDelete(); }}
+                                        className={styles.dangerItem}
+                                    >
+                                        Delete
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
                 {/* Reply Preview */}
                 {replySource && (
                     <div className={styles.replyPreview}>
@@ -187,57 +279,35 @@ export default function MessageBubble({
                     </a>
                 )}
 
-                {/* Edit Mode */}
-                {editing ? (
-                    <div className={styles.editArea}>
-                        <textarea
-                            value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            className={styles.editInput}
-                            rows={2}
-                            autoFocus
-                        />
-                        <div className={styles.editActions}>
-                            <button
-                                className={styles.editSave}
-                                onClick={handleSaveEdit}
-                                disabled={saving}
-                            >
-                                <Check size={14} />
-                            </button>
-                            <button
-                                className={styles.editCancel}
-                                onClick={() => setEditing(false)}
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
+                {/* Instagram Style Edit History (Inline) */}
+                {showHistory && editHistory.length > 0 && (
+                    <div className={styles.inlineHistory}>
+                        {loadingHistory && <div className={styles.historyLoading}>Loading…</div>}
+                        {editHistory.map((h) => (
+                            <div key={h.id} className={styles.historyEntry}>
+                                <p className={styles.historyText}>{h.old_text}</p>
+                            </div>
+                        ))}
                     </div>
-                ) : (
-                    displayText && (
-                        <span className={styles.text}>
-                            {displayText.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                                part.match(/^https?:\/\//) ? (
-                                    <a
-                                        key={i}
-                                        href={part}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={styles.link}
-                                    >
-                                        {part}
-                                    </a>
-                                ) : (
-                                    <span key={i}>{part}</span>
-                                )
-                            )}
-                        </span>
-                    )
                 )}
 
-                <span className={styles.meta}>
+                {/* Message Text */}
+                {displayText && (
+                    <span className={styles.text}>
+                        {renderTextWithMentions(displayText)}
+                    </span>
+                )}
+
+                {/* Inline WA Meta data */}
+                <span className={styles.metaContainer}>
                     {message.edited_at && (
-                        <span className={styles.edited}>edited</span>
+                        <span
+                            className={styles.editedTag}
+                            onClick={handleShowHistory}
+                            title="View old text"
+                        >
+                            {showHistory ? 'hide edits' : 'edited'}
+                        </span>
                     )}
                     <span className={styles.time}>{formatMsgTime(message.created_at)}</span>
                 </span>

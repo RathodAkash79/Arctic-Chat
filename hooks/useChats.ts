@@ -161,12 +161,15 @@ export function useChats() {
 
 
 
-    // Open a chat
+    // Open a chat — also pushes its URL so each chat has a unique route
     const openChat = useCallback(
         (chat: ChatListItem) => {
             setCurrentChat(chat);
-            // On mobile, open the chat panel
             useAppStore.getState().setIsMobileChatOpen(true);
+            // Update the URL to /[chatId] without a full page reload
+            if (typeof window !== 'undefined') {
+                window.history.pushState(null, '', `/${chat.id}`);
+            }
         },
         [setCurrentChat]
     );

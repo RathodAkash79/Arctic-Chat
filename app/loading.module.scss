@@ -1,0 +1,61 @@
+@import '../styles/_variables';
+
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.logoWrapper {
+    width: 90px;
+    height: 90px;
+    margin-bottom: 2rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    // Smooth infinite pulse scaling
+    animation: pulseScale 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.pulsingLogo {
+    object-fit: contain;
+    filter: drop-shadow(0 0 16px rgba(14, 165, 233, 0.5));
+}
+
+.loadingText {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    font-weight: $font-medium;
+    animation: fadeInOut 2.5s ease-in-out infinite;
+}
+
+@keyframes pulseScale {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+    }
+}
+
+@keyframes fadeInOut {
+
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}

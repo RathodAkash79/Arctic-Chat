@@ -7,12 +7,11 @@ import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import NewChatModal from '@/components/modals/NewChatModal';
 import CreateGroupModal from '@/components/modals/CreateGroupModal';
+import SettingsModal from '@/components/modals/SettingsModal';
 import {
   Search,
   Plus,
   Settings,
-  Moon,
-  Sun,
   LogOut,
   MessageSquare,
   Users,
@@ -43,15 +42,14 @@ export default function LeftSidebar() {
   const { chats, openChat } = useChats();
   const {
     currentChat,
-    theme,
-    toggleTheme,
     onlineUsers,
     isNewChatModalOpen,
     setIsNewChatModalOpen,
+    isSettingsOpen,
+    setIsSettingsOpen,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
@@ -65,6 +63,9 @@ export default function LeftSidebar() {
       return chat.name?.toLowerCase().includes(q);
     });
   }, [chats, searchQuery]);
+
+  const isWorkspaceUser = (currentUser?.role_weight ?? 0) >= 20;
+  const isAdmin = (currentUser?.role_weight ?? 0) >= 200;
 
   return (
     <div className={styles.sidebar}>
@@ -85,37 +86,34 @@ export default function LeftSidebar() {
         <div className={styles.headerActions}>
           <button
             className={styles.iconBtn}
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={() => setIsSettingsOpen(true)}
             title="Settings"
           >
             <Settings size={20} />
           </button>
+          <button
+            className={`${styles.iconBtn} ${styles.signOutBtn}`}
+            onClick={signOut}
+            title="Sign Out"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
 
-      {/* Settings Menu */}
-      {showSettings && (
-        <div className={styles.settingsMenu}>
-          <button onClick={toggleTheme}>
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-          {(currentUser?.role_weight ?? 0) >= 20 && (
-            <Link href="/workspace" className={styles.settingsLink}>
-              <LayoutDashboard size={16} />
-              <span>Workspace</span>
-            </Link>
-          )}
-          {(currentUser?.role_weight ?? 0) >= 200 && (
-            <Link href="/admin" className={`${styles.settingsLink} ${styles.adminLink}`}>
+      {/* Workspace nav link — visible only to staff+ */}
+      {isWorkspaceUser && (
+        <div className={styles.navSection}>
+          <Link href="/workspace" className={styles.navLink}>
+            <LayoutDashboard size={16} />
+            <span>Workspace</span>
+          </Link>
+          {isAdmin && (
+            <Link href="/admin" className={`${styles.navLink} ${styles.navLinkAdmin}`}>
               <Shield size={16} />
               <span>Admin Panel</span>
             </Link>
           )}
-          <button onClick={signOut}>
-            <LogOut size={16} />
-            <span>Sign Out</span>
-          </button>
         </div>
       )}
 
@@ -220,6 +218,7 @@ export default function LeftSidebar() {
       {/* Modals */}
       {isNewChatModalOpen && <NewChatModal />}
       {isCreateGroupOpen && <CreateGroupModal onClose={() => setIsCreateGroupOpen(false)} />}
+      {isSettingsOpen && <SettingsModal />}
     </div>
   );
 }

@@ -6,7 +6,8 @@ export type UserRole = 'god' | 'management' | 'developer' | 'staff' | 'trial_sta
 export type UserStatus = 'active' | 'banned' | 'timeout';
 export type ChatType = 'dm' | 'group';
 export type GroupRole = 'owner' | 'admin' | 'member';
-export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+export type TaskStatus = 'pending' | 'in_progress' | 'in_review' | 'completed';
+export type Theme = 'light' | 'dark' | 'system';
 
 // Role weight mapping for hierarchy
 export const ROLE_WEIGHTS: Record<UserRole, number> = {
@@ -20,6 +21,14 @@ export const ROLE_WEIGHTS: Record<UserRole, number> = {
 
 // Roles that can see the Workspace/Tasks feature
 export const WORKSPACE_ROLES: UserRole[] = ['god', 'management', 'developer', 'staff', 'trial_staff'];
+
+export const WORKSPACE_TIERS = [
+  { id: 'trial_staff', name: 'Trial Staff', min_weight: 20 },
+  { id: 'staff', name: 'Staff', min_weight: 50 },
+  { id: 'developer', name: 'Developer', min_weight: 80 },
+  { id: 'management', name: 'Management', min_weight: 100 },
+  { id: 'god', name: 'God', min_weight: 200 },
+];
 
 // Roles that can access Admin page
 export const ADMIN_ROLES: UserRole[] = ['god'];
@@ -50,6 +59,7 @@ export interface Chat {
   last_message?: string;
   last_message_time?: string;
   created_at: string;
+  is_workplace?: boolean;
 }
 
 // Chat with resolved participant info (for sidebar rendering)
@@ -68,12 +78,18 @@ export interface ChatParticipant {
   user?: User;
 }
 
+// Mention in a message
+export interface MentionedUser {
+  id: string;
+  display_name: string;
+}
+
 // Message Interface
 export interface Message {
   id: string;
   chat_id: string;
   sender_id: string;
-  text: string; // Encrypted payload
+  text: string; // Encrypted payload on wire, plaintext in store
   media_url?: string;
   is_compressed: boolean;
   is_disappearing: boolean;
@@ -81,6 +97,7 @@ export interface Message {
   is_deleted?: boolean;
   edited_at?: string;
   reply_to_id?: string;
+  mentions?: MentionedUser[];
   link_preview?: { title?: string; description?: string; image?: string; url?: string } | null;
   created_at: string;
   sender?: User;
@@ -92,11 +109,49 @@ export interface Task {
   title: string;
   description?: string;
   assigned_by: string;
+  assigned_to_user_id?: string;
+  assigned_to_role_weight?: number;
   target_role_weight: number;
+  chat_id?: string;
   status: TaskStatus;
   created_at: string;
   updated_at?: string;
   assigner?: User;
+  assignee?: User;
+}
+
+// Task Comment Interface
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  text: string; // Decrypted on load
+  created_at: string;
+  user?: User;
+}
+
+// Message Edit History
+export interface MessageEditHistory {
+  id: string;
+  message_id: string;
+  old_text: string; // Decrypted on load
+  edited_at: string;
+}
+
+// Group Timeout (per-group)
+export interface GroupTimeout {
+  chat_id: string;
+  user_id: string;
+  timed_until: string;
+}
+
+// Feedback / Bug Report
+export interface Feedback {
+  id: string;
+  user_id: string;
+  message: string; // Decrypted on load
+  created_at: string;
+  user?: User;
 }
 
 // Whitelist Interface

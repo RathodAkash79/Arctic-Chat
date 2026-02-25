@@ -12,8 +12,8 @@ import {
     Clock,
     Plus,
     Trash2,
-    ChevronDown,
     Database,
+    MessageSquarePlus,
 } from 'lucide-react';
 import styles from './admin.module.scss';
 
@@ -25,8 +25,9 @@ export default function AdminPage() {
     const [newEmail, setNewEmail] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'users' | 'whitelist' | 'analytics'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'whitelist' | 'analytics' | 'feedback'>('users');
     const [storageStats, setStorageStats] = useState<{ id: string; name: string; storage_used_bytes: number }[]>([]);
+    const [feedbackList, setFeedbackList] = useState<{ id: string; message: string; created_at: string; user?: { display_name: string; pfp_url?: string } }[]>([]);
 
     // Role guard: only role_weight >= 200
     useEffect(() => {
@@ -43,14 +44,27 @@ export default function AdminPage() {
 
     const fetchData = async () => {
         setLoading(true);
-        const [{ data: usersData }, { data: whiteData }, { data: statsData }] = await Promise.all([
+        const [{ data: usersData }, { data: whiteData }, { data: statsData }, { data: fbData }] = await Promise.all([
             supabase.from('users').select('*').order('role_weight', { ascending: false }),
             supabase.from('whitelist').select('*').order('created_at', { ascending: false }),
             supabase.from('chats').select('id, name, storage_used_bytes').order('storage_used_bytes', { ascending: false }),
+            supabase.from('feedback').select('id, message, created_at, user:user_id(display_name, pfp_url)').order('created_at', { ascending: false }),
         ]);
         setUsers((usersData || []) as User[]);
         setWhitelist(whiteData || []);
         setStorageStats((statsData || []) as { id: string; name: string; storage_used_bytes: number }[]);
+
+        // Decrypt feedback messages
+        if (fbData) {
+            const { decryptMessage } = await import('@/lib/crypto');
+            const decrypted = await Promise.all(
+                (fbData as any[]).map(async (f) => ({
+                    ...f,
+                    message: await decryptMessage(f.message).catch(() => f.message),
+                }))
+            );
+            setFeedbackList(decrypted);
+        }
         setLoading(false);
     };
 
@@ -121,9 +135,18 @@ export default function AdminPage() {
                 </h2>
                 <nav className={styles.nav}>
                     {[
-                        { id: 'users', icon: <Users size={16} />, label: 'Users' },
-                        { id: 'whitelist', icon: <Plus size={16} />, label: 'Whitelist' },
-                        { id: 'analytics', icon: <Database size={16} />, label: 'Analytics' },
+                        {
+                            id: 'users', icon: <Users size={16} />, label: 'Users',
+                        },
+                        {
+                            id: 'whitelist', icon: <Plus size={16} />, label: 'Whitelist',
+                        },
+                        {
+                            id: 'analytics', icon: <Database size={16} />, label: 'Analytics',
+                        },
+                        {
+                            id: 'feedback', icon: <MessageSquarePlus size={16} />, label: 'Feedback',
+                        },
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -250,6 +273,34 @@ export default function AdminPage() {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* FEEDBACK TAB */}
+                        {activeTab === 'feedback' && (
+                            <div className={styles.section}>
+                                <h3 className={styles.sectionTitle}>Feedback & Reports</h3>
+                                {feedbackList.length === 0 ? (
+                                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>No feedback submitted yet.</p>
+                                ) : (
+                                    <div className={styles.whitelistTable}>
+                                        {feedbackList.map((fb) => (
+                                            <div key={fb.id} className={styles.whitelistRow} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.375rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
+                                                    <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                                                        {fb.user?.display_name || 'Unknown'}
+                                                    </span>
+                                                    <span className={styles.whitelistDate}>
+                                                        {new Date(fb.created_at).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                                                    {fb.message}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 

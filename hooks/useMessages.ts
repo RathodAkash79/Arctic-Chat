@@ -4,7 +4,7 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import { encryptMessage, decryptMessage, hasPassphrase } from '@/lib/crypto';
-import type { Message } from '@/types';
+import type { Message, MentionedUser } from '@/types';
 
 const PAGE_SIZE = 30;
 
@@ -74,7 +74,6 @@ export function useMessages() {
 
         setLoadingMessages(true);
 
-        // We need to compare against the original created_at from the database
         const { data, error } = await supabase
             .from('messages')
             .select('*')
@@ -97,14 +96,18 @@ export function useMessages() {
 
     // Send a message (text and/or media)
     const sendMessage = useCallback(
-        async (text: string, mediaUrl?: string, replyToId?: string, isDisappearing?: boolean) => {
+        async (
+            text: string,
+            mediaUrl?: string,
+            replyToId?: string,
+            isDisappearing?: boolean,
+            mentions?: MentionedUser[]
+        ) => {
             if (!currentUser || !currentChat) return;
             if (!text.trim() && !mediaUrl) return;
 
             setSendingMessage(true);
 
-            // 1. Pre-generate UUID for optimistic update & deduplication
-            // Fallback for mobile HTTP testing where crypto.randomUUID is undefined
             const msgId = typeof crypto !== 'undefined' && crypto.randomUUID
                 ? crypto.randomUUID()
                 : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -114,17 +117,20 @@ export function useMessages() {
 
             const now = new Date().toISOString();
 
-            // 2. Optimistic UI update immediately
+            // Optimistic UI update immediately (plaintext)
             const optimisticMsg: Message = {
                 id: msgId,
                 chat_id: currentChat.id,
                 sender_id: currentUser.id,
-                text: text || '', // Display plaintext immediately
+                text: text || '',
                 media_url: mediaUrl || undefined,
                 is_compressed: !!mediaUrl,
                 is_disappearing: isDisappearing || false,
                 expires_at: isDisappearing ? new Date(Date.now() + 86400000).toISOString() : undefined,
+                mentions: mentions || [],
                 created_at: now,
+                // Include reply_to_id so the sender sees the reply preview immediately
+                ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
             addMessage(optimisticMsg);
 
@@ -135,19 +141,19 @@ export function useMessages() {
                 now
             );
 
-            // 3. Encrypt the text (if passphrase set)
-            // We await this because it's local and very fast
+            // Encrypt the text before storing
             let encryptedText = '';
             if (text.trim()) {
                 try {
                     encryptedText = await encryptMessage(text.trim());
                 } catch (err) {
                     console.error('Encryption error:', err);
+                    encryptedText = text.trim(); // fallback plaintext
                 }
             }
 
             if (text.trim() && !hasPassphrase()) {
-                console.warn('Sending message as plaintext because no E2EE passphrase is set!');
+                console.warn('No passphrase set — message sent as plaintext.');
             }
 
             const payload: Record<string, unknown> = {
@@ -156,6 +162,8 @@ export function useMessages() {
                 sender_id: currentUser.id,
                 text: encryptedText || (mediaUrl ? '[Media]' : ''),
                 created_at: now,
+                // Only include these columns if they have values (they may not exist if patches aren't run)
+                ...(mentions && mentions.length > 0 ? { mentions } : {}),
                 ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
 
@@ -163,29 +171,27 @@ export function useMessages() {
                 payload.media_url = mediaUrl;
                 payload.is_compressed = true;
                 payload.is_disappearing = isDisappearing || false;
-
                 if (isDisappearing) {
                     payload.expires_at = new Date(Date.now() + 86400000).toISOString();
                 }
             }
 
-            // UNBLOCK UI IMMEDIATELY
-            setSendingMessage(false);
-
-            // 4. Send to Supabase (Fire and forget network request)
+            // Fire and forget — but log properly
             const sendToDB = async () => {
                 try {
                     const { error } = await supabase.from('messages').insert(payload);
                     if (error) {
-                        console.error('Failed to send message:', error);
+                        console.error('Failed to send message:', error.message, error.code, error.details, error.hint);
                     }
-                } catch (err: any) {
+                } catch (err: unknown) {
                     console.error('Send network error:', err);
+                } finally {
+                    setSendingMessage(false);
                 }
             };
             sendToDB();
         },
-        [currentUser, currentChat, addMessage]
+        [currentUser, currentChat, addMessage, updateChatLastMessage]
     );
 
     // Fetch messages when chat changes
@@ -194,15 +200,13 @@ export function useMessages() {
             setMessages([]);
             return;
         }
-
         fetchMessages(currentChat.id);
     }, [currentChat?.id, fetchMessages, setMessages]);
 
-    // Realtime subscription for new messages in the active chat
+    // Realtime subscription for new messages
     useEffect(() => {
         if (!currentChat) return;
 
-        // Clean up previous channel
         if (channelRef.current) {
             supabase.removeChannel(channelRef.current);
         }
@@ -219,18 +223,36 @@ export function useMessages() {
                 },
                 async (payload) => {
                     const newMsg = payload.new as Message;
-                    // Decrypt the incoming message
+                    // Skip own optimistic message (already in store)
+                    if (newMsg.sender_id === useAppStore.getState().currentUser?.id) return;
                     if (hasPassphrase()) {
                         newMsg.text = await decryptMessage(newMsg.text);
                     }
                     addMessage(newMsg);
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `chat_id=eq.${currentChat.id}`,
+                },
+                async (payload) => {
+                    const updated = payload.new as Message;
+                    if (hasPassphrase() && updated.text && !updated.is_deleted) {
+                        updated.text = await decryptMessage(updated.text);
+                    }
+                    useAppStore.setState((s) => ({
+                        messages: s.messages.map((m) => m.id === updated.id ? { ...m, ...updated } : m),
+                    }));
+                }
+            )
             .subscribe();
 
         channelRef.current = channel;
 
-        // Initialize typing broadcast channel
         if (typingChannelRef.current) {
             supabase.removeChannel(typingChannelRef.current);
         }
@@ -263,12 +285,11 @@ export function useMessages() {
                 supabase.removeChannel(typingChannelRef.current);
                 typingChannelRef.current = null;
             }
-            // Clear typing state on unmount
             setTypingUsers(currentChat.id, []);
         };
     }, [currentChat?.id, addMessage, setTypingUsers]);
 
-    // Expose a function to broadcast typing state
+    // Broadcast typing state
     const sendTypingEvent = useCallback(async (isTyping: boolean) => {
         if (!typingChannelRef.current || !currentUser) return;
         await typingChannelRef.current.send({
