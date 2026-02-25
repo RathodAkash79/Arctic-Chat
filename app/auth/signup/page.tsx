@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
-  Snowflake,
   Mail,
   Lock,
   AlertCircle,

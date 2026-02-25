@@ -332,9 +332,23 @@ code {
   }
 }
 
+
 // Hide on desktop
 .hidden-desktop {
   @include md {
     display: none !important;
+  }
+}
+
+.highlightFade {
+  animation: highlightFlash 2s ease-out;
+}
+
+@keyframes highlightFlash {
+  0% {
+    background-color: rgba(6, 182, 212, 0.4);
+  }
+  100% {
+    background-color: transparent;
   }
 }

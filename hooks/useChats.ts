@@ -167,6 +167,19 @@ export function useChats() {
         };
     }, [currentUser, updateChatLastMessage, fetchChats]);
 
+    // Re-fetch chat list when Supabase refreshes the auth token in the background
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (event) => {
+                if (event === 'TOKEN_REFRESHED' && currentUser) {
+                    console.log('[useChats] Token refreshed — re-fetching chats');
+                    fetchChats();
+                }
+            }
+        );
+        return () => subscription.unsubscribe();
+    }, [currentUser, fetchChats]);
+
 
 
     // Open a chat — also pushes its URL so each chat has a unique route

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Snowflake, Lock, AlertCircle } from 'lucide-react';
+import { Lock, AlertCircle } from 'lucide-react';
 import styles from '../login/login.module.scss';
 
 export default function ResetPasswordPage() {

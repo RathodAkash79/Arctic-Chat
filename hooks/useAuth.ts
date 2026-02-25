@@ -71,40 +71,30 @@ export function useAuth() {
         let mounted = true;
 
         const init = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
 
-            if (!session?.user) {
-                if (mounted) {
-                    setCurrentUser(null);
-                    setLoading(false);
-                    router.replace('/auth/login');
+                if (!session?.user) {
+                    if (mounted) {
+                        setCurrentUser(null);
+                        setLoading(false);
+                        router.replace('/auth/login');
+                    }
+                    return;
                 }
-                return;
-            }
 
-            const profile = await fetchProfile(session.user.id);
+                const profile = await fetchProfile(session.user.id);
 
-            if (!profile) {
-                if (mounted) {
-                    setLoading(false);
-                    router.replace('/auth/setup-profile');
+                if (!profile) {
+                    if (mounted) {
+                        setLoading(false);
+                        router.replace('/auth/setup-profile');
+                    }
+                    return;
                 }
-                return;
-            }
 
-            // Check ban/timeout at login time
-            if (profile.status === 'banned') {
-                await supabase.auth.signOut();
-                if (mounted) {
-                    setCurrentUser(null);
-                    setLoading(false);
-                    router.replace('/auth/login');
-                }
-                return;
-            }
-
-            if (profile.status === 'timeout' && profile.timeout_until) {
-                if (new Date(profile.timeout_until) > new Date()) {
+                // Check ban/timeout at login time
+                if (profile.status === 'banned') {
                     await supabase.auth.signOut();
                     if (mounted) {
                         setCurrentUser(null);
@@ -113,16 +103,42 @@ export function useAuth() {
                     }
                     return;
                 }
-            }
 
-            if (mounted) {
-                setCurrentUser(profile);
-                subscribeToStatusChanges(profile.id);
-                setLoading(false);
+                if (profile.status === 'timeout' && profile.timeout_until) {
+                    if (new Date(profile.timeout_until) > new Date()) {
+                        await supabase.auth.signOut();
+                        if (mounted) {
+                            setCurrentUser(null);
+                            setLoading(false);
+                            router.replace('/auth/login');
+                        }
+                        return;
+                    }
+                }
+
+                if (mounted) {
+                    setCurrentUser(profile);
+                    subscribeToStatusChanges(profile.id);
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error('[useAuth] Init failed:', err);
+                if (mounted) {
+                    setLoading(false);
+                    router.replace('/auth/login');
+                }
             }
         };
 
-        init();
+        // Safety timeout: if init() hangs (stale connection), force loading=false after 10s
+        const safetyTimer = setTimeout(() => {
+            if (mounted && loading) {
+                console.warn('[useAuth] Auth init timed out after 10s — forcing load complete');
+                setLoading(false);
+            }
+        }, 10000);
+
+        init().finally(() => clearTimeout(safetyTimer));
 
         // Listen for auth changes (sign out, etc.)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(

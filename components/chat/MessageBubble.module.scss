@@ -147,6 +147,10 @@
     font-size: 0.75rem;
     font-weight: $font-semibold;
     color: var(--accent-primary);
+
+    &:hover {
+        text-decoration: underline;
+    }
 }
 
 .text {
@@ -171,6 +175,12 @@
     background: rgba(56, 189, 248, 0.12);
     border-radius: 4px;
     padding: 0 3px;
+    cursor: pointer;
+
+    &:hover {
+        background: rgba(56, 189, 248, 0.25);
+        text-decoration: underline;
+    }
 }
 
 // Media (images)
@@ -256,15 +266,26 @@
 .failedIcon {
     display: inline-flex;
     align-items: center;
+    gap: 3px;
     color: var(--danger, #ef4444);
     opacity: 0.9;
     cursor: pointer;
-    transition: transform 0.15s, opacity 0.15s;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: transform 0.15s, opacity 0.15s, background 0.15s;
 
     &:hover {
         opacity: 1;
-        transform: scale(1.1);
+        transform: scale(1.05);
+        background: rgba(239, 68, 68, 0.1);
     }
+}
+
+.retryText {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 // Inline History

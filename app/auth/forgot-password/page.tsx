@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { Snowflake, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 import styles from '../login/login.module.scss';
 
 export default function ForgotPasswordPage() {

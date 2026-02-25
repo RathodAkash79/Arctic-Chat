@@ -41,7 +41,7 @@ export default function MessageBubble({
     isPinned,
 }: Props) {
     const router = useRouter();
-    const { currentChat, currentUser, messages } = useAppStore();
+    const { currentChat, currentUser, messages, setCurrentChat, setIsMobileChatOpen } = useAppStore();
     const [displayText, setDisplayText] = useState<string | null>(null);
     const [replySourceText, setReplySourceText] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
@@ -113,14 +113,43 @@ export default function MessageBubble({
     const handleClickSender = useCallback(async () => {
         if (!senderParticipant || !currentUser) return;
         const targetUserId = senderParticipant.user_id;
-        // Try to find existing DM first
-        const { data: existing } = await supabase.rpc('get_or_create_dm_chat', {
-            other_user_id: targetUserId,
-        });
-        if (existing) {
-            router.push('/');
+        if (targetUserId === currentUser.id) return;
+
+        // FAST PATH: Check if DM already in local store
+        const existingLocal = useAppStore.getState().chats.find(
+            (c) => c.type === 'dm' && c.participants?.some((p) => p.user_id === targetUserId)
+        );
+        if (existingLocal) {
+            setCurrentChat(existingLocal);
+            setIsMobileChatOpen(true);
+            router.push(`/${existingLocal.id}`);
+            return;
         }
-    }, [senderParticipant, currentUser, router]);
+
+        try {
+            const { data, error } = await supabase.rpc('get_or_create_dm_chat_v2', {
+                target_user_id: targetUserId,
+            });
+            if (error) {
+                console.error('RPC Error details:', error);
+                throw new Error(error.message || 'Unknown RPC error');
+            }
+            if (data) {
+                router.push(`/${data}`);
+            }
+        } catch (err: any) {
+            console.error('Failed to open DM:', err.message || err);
+        }
+    }, [senderParticipant, currentUser, router, setCurrentChat, setIsMobileChatOpen]);
+
+    const handleScrollToMessage = (id: string) => {
+        const el = document.getElementById(`msg-${id}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add(styles.highlightFade);
+            setTimeout(() => el.classList.remove(styles.highlightFade), 2000);
+        }
+    };
 
     const handleDelete = useCallback(async () => {
         if (!canDelete) return;
@@ -186,15 +215,47 @@ export default function MessageBubble({
             if (urlPart.match(/^https?:\/\//)) {
                 return [<a key={`u${ui}`} href={urlPart} target="_blank" rel="noopener noreferrer" className={styles.link}>{urlPart}</a>];
             }
-            return urlPart.split(mentionRegex).map((seg, si) =>
-                mentionRegex.test(seg) ? (
-                    <span key={`m${ui}-${si}`} className={styles.mention}>{seg}</span>
-                ) : (
-                    <span key={`t${ui}-${si}`}>{seg}</span>
-                )
-            );
+            return urlPart.split(mentionRegex).map((seg, si) => {
+                const isMention = mentionRegex.test(seg);
+                if (isMention) {
+                    const mentionName = seg.replace(/^@/, '');
+                    const mUser = mentions.find(m => m.display_name === mentionName);
+                    return (
+                        <span
+                            key={`m${ui}-${si}`}
+                            className={styles.mention}
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                if (mUser) {
+                                    // FAST PATH: Check if DM already in local store
+                                    const existingLocal = useAppStore.getState().chats.find(
+                                        (c) => c.type === 'dm' && c.participants?.some((p) => p.user_id === mUser.id)
+                                    );
+                                    if (existingLocal) {
+                                        setCurrentChat(existingLocal);
+                                        setIsMobileChatOpen(true);
+                                        router.push(`/${existingLocal.id}`);
+                                        return;
+                                    }
+
+                                    try {
+                                        const { data, error } = await supabase.rpc('get_or_create_dm_chat_v2', { target_user_id: mUser.id });
+                                        if (error) throw error;
+                                        if (data) router.push(`/${data}`);
+                                    } catch (err: any) {
+                                        console.error('Mention DM failed:', err.message || err);
+                                    }
+                                }
+                            }}
+                        >
+                            {seg}
+                        </span>
+                    );
+                }
+                return <span key={`t${ui}-${si}`}>{seg}</span>;
+            });
         });
-    }, [message.mentions]);
+    }, [message.mentions, router, setCurrentChat, setIsMobileChatOpen]);
 
     if (message.is_deleted) {
         return (
@@ -208,6 +269,7 @@ export default function MessageBubble({
 
     return (
         <div
+            id={`msg-${message.id}`}
             className={`${styles.wrapper} ${isOwn ? styles.own : styles.other} ${showTail ? styles.tail : ''}`}
             onDoubleClick={handleReply}
         >
@@ -263,7 +325,13 @@ export default function MessageBubble({
                 )}
                 {/* Reply Preview */}
                 {replySource && (
-                    <div className={styles.replyPreview}>
+                    <div
+                        className={styles.replyPreview}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleScrollToMessage(message.reply_to_id!);
+                        }}
+                    >
                         <span className={styles.replyAuthor}>
                             {replySource.sender_id === currentUser?.id
                                 ? 'You'
@@ -327,14 +395,14 @@ export default function MessageBubble({
                     {message.is_failed && isOwn && (
                         <span
                             className={styles.failedIcon}
-                            title="Failed to send. Click to retry."
+                            title="Failed to send. Tap to retry."
                             onClick={(e) => {
                                 e.stopPropagation();
-                                // We emit an event to useMessages to trigger a retry
                                 window.dispatchEvent(new CustomEvent('retry-message', { detail: { msgId: message.id } }));
                             }}
                         >
-                            <AlertCircle size={10} />
+                            <AlertCircle size={14} />
+                            <span className={styles.retryText}>Retry</span>
                         </span>
                     )}
                 </span>

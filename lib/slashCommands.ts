@@ -27,7 +27,7 @@ export async function executeSlashCommand(
     chatId: string,
     callerUserId: string,
     callerGroupRole: GroupRole,
-    callerRoleWeight: number,
+    _callerRoleWeight: number,
     participants: ChatParticipant[]
 ): Promise<CommandResult> {
     const trimmed = rawInput.trim();

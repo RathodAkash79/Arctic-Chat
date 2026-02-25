@@ -52,6 +52,49 @@
   margin-bottom: 0.5rem;
 }
 
+// ── Fetch Error / Retry UI ───────────────────────────────
+.fetchError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  flex: 1;
+  color: var(--text-secondary);
+
+  svg {
+    color: var(--danger, #ef4444);
+    opacity: 0.7;
+  }
+
+  p {
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
+  button {
+    padding: 0.5rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent-primary);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+
+    &:hover {
+      background: var(--accent-hover);
+      transform: scale(1.02);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+}
+
 // ============================================
 // CHAT HEADER
 // ============================================
@@ -205,6 +248,7 @@
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+  will-change: transform; // GPU compositing — prevents stall after tab switch
 }
 
 .spinnerSmall {

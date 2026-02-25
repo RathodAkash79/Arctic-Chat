@@ -11,6 +11,7 @@ import {
   Info,
   ChevronDown,
   X as XIcon,
+  AlertCircle,
 } from 'lucide-react';
 import styles from './MiddlePanel.module.scss';
 
@@ -32,6 +33,8 @@ export default function MiddlePanel() {
     sendMessage,
     sendTypingEvent,
     loadMore,
+    fetchError,
+    retryFetch,
   } = useMessages();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -92,6 +95,15 @@ export default function MiddlePanel() {
       isLoadingOlderRef.current = false;
     }
   });
+
+  const handleScrollToMessage = useCallback((id: string) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('highlightFade');
+      setTimeout(() => el.classList.remove('highlightFade'), 2000);
+    }
+  }, []);
 
   // Detect scroll position — set userScrolledUp flag
   const loadMoreDebounce = useRef(false);
@@ -269,8 +281,14 @@ export default function MiddlePanel() {
       {pinnedMessages.length > 0 && (
         <div
           className={styles.pinnedBanner}
-          onClick={() => pinnedMessages.length > 1 && setShowPinnedModal(true)}
-          style={{ cursor: pinnedMessages.length > 1 ? 'pointer' : 'default' }}
+          onClick={() => {
+            if (pinnedMessages.length > 1) {
+              setShowPinnedModal(true);
+            } else if (latestPinned) {
+              handleScrollToMessage(latestPinned.id);
+            }
+          }}
+          style={{ cursor: 'pointer' }}
         >
           <span className={styles.pinnedIcon}>📌</span>
           <div className={styles.pinnedContent}>
@@ -307,7 +325,15 @@ export default function MiddlePanel() {
             </div>
             <div className={styles.pinnedModalList}>
               {pinnedMessages.map((m) => (
-                <div key={m.id} className={styles.pinnedModalItem}>
+                <div
+                  key={m.id}
+                  className={styles.pinnedModalItem}
+                  onClick={() => {
+                    setShowPinnedModal(false);
+                    handleScrollToMessage(m.id);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <span className={styles.pinnedModalText}>
                     {m.media_url ? '📷 Photo' : m.text}
                   </span>
@@ -331,9 +357,18 @@ export default function MiddlePanel() {
         ref={messagesContainerRef}
         onScroll={handleScroll}
       >
-        {loadingMessages && messages.length === 0 && (
+        {loadingMessages && messages.length === 0 && !fetchError && (
           <div className={styles.loadingState}>
             <div className={styles.spinner} />
+          </div>
+        )}
+
+        {/* Fetch Error State — replace infinite spinner */}
+        {fetchError && !loadingMessages && messages.length === 0 && (
+          <div className={styles.fetchError}>
+            <AlertCircle size={48} />
+            <p>Failed to load messages</p>
+            <button onClick={retryFetch}>Try Again</button>
           </div>
         )}
 
