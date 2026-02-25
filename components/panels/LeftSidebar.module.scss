@@ -387,11 +387,49 @@
     white-space: nowrap;
     transition: all 0.15s ease;
 
-    &:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
   }
+}
+
+// ============================================
+// PINNED CHAT STYLES
+// ============================================
+
+.chatPinBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0;
+  padding: 4px 6px;
+  min-height: unset; // override global 44px min-height for this small icon
+  border-radius: 4px;
+  transition: opacity 0.15s, background 0.15s;
+  margin-left: auto;
+
+  // Show on hover (desktop)
+  .chatItem:hover & {
+    opacity: 1;
+  }
+
+  // Always show on touch devices (no hover)
+  @media (hover: none) {
+    opacity: 0.6;
+  }
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.pinnedChat {
+  border-left: 2px solid var(--accent-primary);
+}
+
+.pinIndicator {
+  font-size: 0.75rem;
+  margin-right: 3px;
+  vertical-align: middle;
 }
 
 // ============================================

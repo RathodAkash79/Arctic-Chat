@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveImageUrl } from '@/lib/utils';
 import type { Message, MessageEditHistory } from '@/types';
-import { X, ChevronDown, Clock } from 'lucide-react';
+import { ChevronDown, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { decryptMessage } from '@/lib/crypto';
 import styles from './MessageBubble.module.scss';
@@ -18,6 +18,8 @@ interface Props {
     isGroup: boolean;
     onReply?: (msg: Message) => void;
     onEditRequest?: (msg: Message, decryptedText: string) => void;
+    onPin?: (msg: Message) => void;
+    isPinned?: boolean;
 }
 
 function formatMsgTime(dateStr: string) {
@@ -35,6 +37,8 @@ export default function MessageBubble({
     isGroup,
     onReply,
     onEditRequest,
+    onPin,
+    isPinned,
 }: Props) {
     const router = useRouter();
     const { currentChat, currentUser, messages } = useAppStore();
@@ -240,6 +244,11 @@ export default function MessageBubble({
                                         Edit
                                     </button>
                                 )}
+                                {onPin && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); onPin(message); }}>
+                                        {isPinned ? '📌 Unpin' : '📌 Pin'}
+                                    </button>
+                                )}
                                 {canDelete && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleDelete(); }}
@@ -310,9 +319,22 @@ export default function MessageBubble({
                         </span>
                     )}
                     <span className={styles.time}>{formatMsgTime(message.created_at)}</span>
-                    {message.is_pending && isOwn && (
+                    {message.is_pending && isOwn && !message.is_failed && (
                         <span className={styles.pendingIcon} title="Sending...">
                             <Clock size={10} />
+                        </span>
+                    )}
+                    {message.is_failed && isOwn && (
+                        <span
+                            className={styles.failedIcon}
+                            title="Failed to send. Click to retry."
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                // We emit an event to useMessages to trigger a retry
+                                window.dispatchEvent(new CustomEvent('retry-message', { detail: { msgId: message.id } }));
+                            }}
+                        >
+                            <AlertCircle size={10} />
                         </span>
                     )}
                 </span>

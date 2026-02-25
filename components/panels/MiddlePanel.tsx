@@ -38,37 +38,86 @@ export default function MiddlePanel() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const prevMessageCountRef = useRef(0);
+  const userScrolledUp = useRef(false); // true = user manually scrolled up, pause autoscroll
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [replyToDecrypted, setReplyToDecrypted] = useState<string>('');
   const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
 
-  // Scroll to bottom when new messages arrive
+  const initialScrollDone = useRef(false);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' });
+  }, []);
+
+  // Reset scroll state when chat changes
   useEffect(() => {
-    if (messages.length > prevMessageCountRef.current) {
-      // Only auto-scroll if user is near the bottom
-      const container = messagesContainerRef.current;
-      if (container) {
-        const isNearBottom =
-          container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-        if (isNearBottom || messages.length - prevMessageCountRef.current === messages.length) {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
+    prevMessageCountRef.current = 0;
+    userScrolledUp.current = false;
+    initialScrollDone.current = false;
+    setShowScrollBtn(false);
+  }, [currentChat?.id]);
+
+  // Auto-scroll on new messages unless user scrolled up
+  useEffect(() => {
+    const isNewMessages = messages.length > prevMessageCountRef.current;
+    const isInitialLoad = prevMessageCountRef.current === 0;
+
+    if (isNewMessages) {
+      if (!userScrolledUp.current || isInitialLoad) {
+        // Run after DOM has painted
+        requestAnimationFrame(() => {
+          scrollToBottom(!isInitialLoad);
+          if (isInitialLoad) {
+            // Unblock pagination after scroll finishes settling
+            setTimeout(() => {
+              initialScrollDone.current = true;
+            }, 150);
+          }
+        });
       }
     }
     prevMessageCountRef.current = messages.length;
-  }, [messages.length]);
+  }, [messages.length, scrollToBottom]);
 
-  // Detect scroll position for "scroll to bottom" FAB
+  // Preserve scroll position after older messages are prepended
+  const prevScrollHeightRef = useRef(0);
+  const isLoadingOlderRef = useRef(false);
+
+  useEffect(() => {
+    if (isLoadingOlderRef.current && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const newScrollHeight = container.scrollHeight;
+      const diff = newScrollHeight - prevScrollHeightRef.current;
+      container.scrollTop += diff;
+      isLoadingOlderRef.current = false;
+    }
+  });
+
+  // Detect scroll position — set userScrolledUp flag
+  const loadMoreDebounce = useRef(false);
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
+
     const distFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    setShowScrollBtn(distFromBottom > 200);
 
-    // Load more when scrolled to top
-    if (container.scrollTop < 50 && hasMore && !loadingMessages) {
-      loadMore();
+    const scrolledUp = distFromBottom > 80;
+
+    // Don't update scroll flags if we're still doing initial scroll layout
+    if (initialScrollDone.current) {
+      userScrolledUp.current = scrolledUp;
+      setShowScrollBtn(scrolledUp);
+
+      // Load more when scrolled to top (debounced)
+      if (container.scrollTop < 50 && hasMore && !loadingMessages && !loadMoreDebounce.current) {
+        loadMoreDebounce.current = true;
+        // Capture current scroll height before prepend
+        prevScrollHeightRef.current = container.scrollHeight;
+        isLoadingOlderRef.current = true;
+        loadMore();
+        setTimeout(() => { loadMoreDebounce.current = false; }, 500);
+      }
     }
   }, [hasMore, loadingMessages, loadMore]);
 
@@ -119,9 +168,51 @@ export default function MiddlePanel() {
     });
   }, [currentChat, typingUsers, currentUser]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Multi-pin system: store array of pinned message IDs in localStorage per chat
+  const getPinnedKey = useCallback(() =>
+    currentChat ? `pinned_msgs_${currentChat.id}` : null, [currentChat]);
+
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [showPinnedModal, setShowPinnedModal] = useState(false);
+
+  // Load pinned IDs when chat changes
+  useEffect(() => {
+    const key = getPinnedKey();
+    if (!key) { setPinnedIds([]); return; }
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) || '[]');
+      setPinnedIds(Array.isArray(stored) ? stored : []);
+    } catch { setPinnedIds([]); }
+  }, [currentChat?.id, getPinnedKey]);
+
+  const handlePin = useCallback((msgId: string) => {
+    const key = getPinnedKey();
+    if (!key) return;
+    setPinnedIds((prev) => {
+      const already = prev.includes(msgId);
+      const next = already ? prev.filter((id) => id !== msgId) : [msgId, ...prev];
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, [getPinnedKey]);
+
+  // Resolve pinned messages from the store
+  const pinnedMessages = useMemo(() =>
+    pinnedIds.map((id) => messages.find((m) => m.id === id)).filter(Boolean) as typeof messages,
+    [pinnedIds, messages]
+  );
+
+  // Decrypt latest pinned message for banner preview
+  const latestPinned = pinnedMessages[0] || null;
+  const [latestPinnedText, setLatestPinnedText] = useState('');
+  useEffect(() => {
+    if (!latestPinned?.text) { setLatestPinnedText(''); return; }
+    import('@/lib/crypto').then(({ decryptMessage }) =>
+      decryptMessage(latestPinned.text)
+        .then(setLatestPinnedText)
+        .catch(() => setLatestPinnedText(latestPinned.text))
+    );
+  }, [latestPinned?.text]);
 
   // Empty state
   if (!currentChat) {
@@ -174,6 +265,65 @@ export default function MiddlePanel() {
           <Info size={20} />
         </button>
       </div>
+      {/* Pinned Message Banner - Arctic theme */}
+      {pinnedMessages.length > 0 && (
+        <div
+          className={styles.pinnedBanner}
+          onClick={() => pinnedMessages.length > 1 && setShowPinnedModal(true)}
+          style={{ cursor: pinnedMessages.length > 1 ? 'pointer' : 'default' }}
+        >
+          <span className={styles.pinnedIcon}>📌</span>
+          <div className={styles.pinnedContent}>
+            <span className={styles.pinnedLabel}>
+              {pinnedMessages.length > 1
+                ? `${pinnedMessages.length} Pinned Messages`
+                : 'Pinned Message'}
+            </span>
+            {pinnedMessages.length === 1 && (
+              <span className={styles.pinnedText}>
+                {latestPinned?.media_url ? '📷 Photo' : (latestPinnedText || '...')}
+              </span>
+            )}
+          </div>
+          {pinnedMessages.length === 1 && latestPinned && (
+            <button
+              className={styles.pinnedUnpin}
+              onClick={(e) => { e.stopPropagation(); handlePin(latestPinned.id); }}
+              title="Unpin"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Pinned Messages Modal */}
+      {showPinnedModal && (
+        <div className={styles.pinnedModalOverlay} onClick={() => setShowPinnedModal(false)}>
+          <div className={styles.pinnedModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.pinnedModalHeader}>
+              <span>📌 Pinned Messages</span>
+              <button onClick={() => setShowPinnedModal(false)}>×</button>
+            </div>
+            <div className={styles.pinnedModalList}>
+              {pinnedMessages.map((m) => (
+                <div key={m.id} className={styles.pinnedModalItem}>
+                  <span className={styles.pinnedModalText}>
+                    {m.media_url ? '📷 Photo' : m.text}
+                  </span>
+                  <button
+                    className={styles.pinnedModalUnpin}
+                    onClick={() => handlePin(m.id)}
+                    title="Unpin"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div
@@ -207,12 +357,13 @@ export default function MiddlePanel() {
             isGroup={currentChat.type === 'group'}
             onReply={async (msg) => {
               setReplyTo(msg);
-              // Decrypt the reply text so the bar shows readable text
               const { decryptMessage } = await import('@/lib/crypto');
               const plain = await decryptMessage(msg.text).catch(() => msg.text);
               setReplyToDecrypted(msg.media_url ? '📷 Photo' : plain);
             }}
             onEditRequest={(msg, decryptedText) => setEditingMessage({ id: msg.id, text: decryptedText })}
+            onPin={(msg) => handlePin(msg.id)}
+            isPinned={pinnedIds.includes(msg.id)}
           />
         ))}
 
@@ -221,7 +372,14 @@ export default function MiddlePanel() {
 
       {/* Scroll to Bottom FAB */}
       {showScrollBtn && (
-        <button className={styles.scrollFab} onClick={scrollToBottom}>
+        <button
+          className={styles.scrollFab}
+          onClick={() => {
+            userScrolledUp.current = false;
+            setShowScrollBtn(false);
+            scrollToBottom();
+          }}
+        >
           <ChevronDown size={20} />
         </button>
       )}

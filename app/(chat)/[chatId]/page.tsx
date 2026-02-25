@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
@@ -14,11 +14,16 @@ export default function ChatPage() {
     const { isMobileChatOpen, isRightPanelOpen, chats, setCurrentChat, setIsMobileChatOpen } = useAppStore();
     useChats();
 
-    // When chats load, activate the one matching the URL
+    const hasActivated = useRef(false);
+
+    // Only activate the chat from the URL once — on initial load.
+    // After that, don't re-run on chats updates (would cause redirect on Realtime events).
     useEffect(() => {
+        if (hasActivated.current) return;
         if (!chatId || !chats.length) return;
         const target = chats.find((c) => c.id === chatId);
         if (target) {
+            hasActivated.current = true;
             setCurrentChat(target);
             setIsMobileChatOpen(true);
         }

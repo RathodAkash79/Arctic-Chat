@@ -25,7 +25,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
   themeColor: '#0ea5e9',
+  // Critical: tells Android Chrome to resize the viewport when keyboard opens
+  // so dvh units shrink and input bar rises above the keyboard
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({

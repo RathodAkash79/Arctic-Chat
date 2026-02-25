@@ -60,6 +60,9 @@ export interface Chat {
   last_message_time?: string;
   created_at: string;
   is_workplace?: boolean;
+  // Pinned message
+  pinned_message_id?: string | null;
+  pinned_at?: string | null;
 }
 
 // Chat with resolved participant info (for sidebar rendering)
@@ -67,6 +70,8 @@ export interface ChatListItem extends Chat {
   participants: ChatParticipant[];
   // Resolved fields for DMs
   dm_user?: User;
+  // Per-user pin flag (from chat_participants)
+  is_pinned?: boolean;
 }
 
 // Chat Participant Interface
@@ -76,6 +81,7 @@ export interface ChatParticipant {
   group_role: GroupRole;
   joined_at?: string;
   user?: User;
+  is_pinned?: boolean;
 }
 
 // Mention in a message
@@ -103,6 +109,8 @@ export interface Message {
   sender?: User;
   // Client-only: true while waiting for DB confirmation (optimistic UI)
   is_pending?: boolean;
+  // Client-only: true if sending completely failed
+  is_failed?: boolean;
 }
 
 // Task Interface

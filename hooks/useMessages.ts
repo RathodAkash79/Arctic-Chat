@@ -25,6 +25,8 @@ export function useMessages() {
     const [sendingMessage, setSendingMessage] = useState(false);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    // Guard: track which chatId we are currently fetching for
+    const fetchingForChatId = useRef<string | null>(null);
 
     // Decrypt a batch of messages
     const decryptBatch = useCallback(async (msgs: Message[]): Promise<Message[]> => {
@@ -40,6 +42,9 @@ export function useMessages() {
     // Fetch latest messages for current chat
     const fetchMessages = useCallback(
         async (chatId: string) => {
+            fetchingForChatId.current = chatId;
+            // Clear immediately so previous chat's messages never show in new chat
+            setMessages([]);
             setLoadingMessages(true);
             setHasMore(true);
 
@@ -50,6 +55,9 @@ export function useMessages() {
                 .order('created_at', { ascending: false })
                 .limit(PAGE_SIZE);
 
+            // If chat changed while we were fetching, discard stale results
+            if (fetchingForChatId.current !== chatId) return;
+
             if (error) {
                 console.error('Failed to fetch messages:', error);
                 setLoadingMessages(false);
@@ -58,6 +66,10 @@ export function useMessages() {
 
             const raw = (data || []).reverse() as Message[];
             const decrypted = await decryptBatch(raw);
+
+            // Final guard after async decrypt
+            if (fetchingForChatId.current !== chatId) return;
+
             setMessages(decrypted);
             setHasMore(raw.length >= PAGE_SIZE);
             setLoadingMessages(false);
@@ -182,16 +194,27 @@ export function useMessages() {
                     const { error } = await supabase.from('messages').insert(payload);
                     if (error) {
                         console.error('Failed to send message:', error.message, error.code, error.details, error.hint);
-                    } else {
-                        // Clear the sending indicator — Realtime may also do this via upsert
+                        // Mark as failed
                         useAppStore.setState((s) => ({
                             messages: s.messages.map((m) =>
-                                m.id === msgId ? { ...m, is_pending: false } : m
+                                m.id === msgId ? { ...m, is_pending: false, is_failed: true } : m
+                            ),
+                        }));
+                    } else {
+                        // Clear the sending indicator
+                        useAppStore.setState((s) => ({
+                            messages: s.messages.map((m) =>
+                                m.id === msgId ? { ...m, is_pending: false, is_failed: false } : m
                             ),
                         }));
                     }
                 } catch (err: unknown) {
                     console.error('Send network error:', err);
+                    useAppStore.setState((s) => ({
+                        messages: s.messages.map((m) =>
+                            m.id === msgId ? { ...m, is_pending: false, is_failed: true } : m
+                        ),
+                    }));
                 } finally {
                     setSendingMessage(false);
                 }
@@ -200,6 +223,67 @@ export function useMessages() {
         },
         [currentUser, currentChat, addMessage, updateChatLastMessage]
     );
+
+    // Listen for retry events from the UI
+    useEffect(() => {
+        const handleRetry = (e: Event) => {
+            const customEvent = e as CustomEvent<{ msgId: string }>;
+            const failedMsg = useAppStore.getState().messages.find(m => m.id === customEvent.detail.msgId);
+            if (!failedMsg || !currentChat) return;
+
+            // Re-mark as pending and remove failed
+            useAppStore.setState((s) => ({
+                messages: s.messages.map((m) =>
+                    m.id === failedMsg.id ? { ...m, is_pending: true, is_failed: false } : m
+                ),
+            }));
+
+            // We must re-encrypt the text since it's plaintext in the store
+            const retrySend = async () => {
+                let textPayload = failedMsg.text;
+                if (hasPassphrase() && textPayload && textPayload !== '[Media]' && textPayload !== '[deleted]') {
+                    textPayload = await encryptMessage(textPayload);
+                }
+
+                const payload = {
+                    id: failedMsg.id,
+                    chat_id: failedMsg.chat_id,
+                    sender_id: failedMsg.sender_id,
+                    text: textPayload,
+                    created_at: failedMsg.created_at,
+                    ...(failedMsg.media_url ? {
+                        media_url: failedMsg.media_url,
+                        is_compressed: true,
+                        is_disappearing: failedMsg.is_disappearing || false,
+                        ...(failedMsg.expires_at ? { expires_at: failedMsg.expires_at } : {})
+                    } : {}),
+                    ...(failedMsg.mentions && failedMsg.mentions.length > 0 ? { mentions: failedMsg.mentions } : {}),
+                    ...(failedMsg.reply_to_id ? { reply_to_id: failedMsg.reply_to_id } : {}),
+                };
+
+                try {
+                    const { error } = await supabase.from('messages').insert(payload);
+                    if (error) throw error;
+                    useAppStore.setState((s) => ({
+                        messages: s.messages.map((m) =>
+                            m.id === failedMsg.id ? { ...m, is_pending: false, is_failed: false } : m
+                        ),
+                    }));
+                } catch (err) {
+                    console.error('Retry failed:', err);
+                    useAppStore.setState((s) => ({
+                        messages: s.messages.map((m) =>
+                            m.id === failedMsg.id ? { ...m, is_pending: false, is_failed: true } : m
+                        ),
+                    }));
+                }
+            };
+            retrySend();
+        };
+
+        window.addEventListener('retry-message', handleRetry);
+        return () => window.removeEventListener('retry-message', handleRetry);
+    }, [currentChat]);
 
     // Fetch messages when chat changes
     useEffect(() => {

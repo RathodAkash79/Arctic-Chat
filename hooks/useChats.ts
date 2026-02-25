@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import type { ChatListItem, ChatParticipant, User } from '@/types';
@@ -104,6 +104,14 @@ export function useChats() {
                 ...chat,
                 participants,
                 dm_user,
+                // Read pin state from localStorage (always works), fallback to DB column
+                is_pinned: (() => {
+                    try {
+                        const stored = JSON.parse(localStorage.getItem(`pinned_chats_${currentUser.id}`) || '{}');
+                        if (chat.id in stored) return stored[chat.id];
+                    } catch { /* ignore */ }
+                    return participants.find((p) => p.user_id === currentUser.id)?.is_pinned || false;
+                })(),
             } as ChatListItem;
         });
 

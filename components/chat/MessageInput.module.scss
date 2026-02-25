@@ -4,11 +4,10 @@
     padding: 0.5rem 1rem 0.75rem;
     flex-shrink: 0;
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-light);
     position: relative;
 
     &.editMode {
-        border-top-color: var(--accent-primary);
+        border-top: 1px solid var(--accent-primary);
     }
 }
 
@@ -229,6 +228,14 @@
 
     &:focus-within {
         border-color: var(--accent-primary);
+    }
+
+    // Override global 44px min-height inside input bar
+    // so buttons/textarea don't get stretched on mobile
+    button,
+    [role='button'],
+    textarea {
+        min-height: unset;
     }
 }
 

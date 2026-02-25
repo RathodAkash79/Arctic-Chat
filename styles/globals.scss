@@ -98,6 +98,8 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  // Use dynamic viewport height — accounts for browser chrome and keyboard
+  height: 100%;
 }
 
 body {
@@ -107,6 +109,37 @@ body {
   font-weight: $font-regular;
   line-height: 1.5;
   transition: background-color 0.3s ease, color 0.3s ease;
+  height: 100%;
+  // Prevent body scroll — the app panels manage their own scroll
+  overflow: hidden;
+}
+
+// ── Mobile: safe areas + touch optimizations ──
+@media (max-width: 768px) {
+  html {
+    // Smaller base font on mobile so UI is less dense
+    font-size: 15px;
+  }
+
+  // All interactive elements must be at least 44x44px (Apple HIG)
+  button,
+  [role='button'],
+  a,
+  input,
+  textarea,
+  select {
+    min-height: 44px;
+    touch-action: manipulation; // prevents 300ms tap delay
+  }
+
+  // Prevent iOS zoom on input focus (must be ≥16px)
+  input[type='text'],
+  input[type='search'],
+  input[type='email'],
+  input[type='password'],
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 // ============================================

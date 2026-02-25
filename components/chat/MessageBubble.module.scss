@@ -43,34 +43,16 @@
         border-top-left-radius: 2px;
     }
 
-    // Tails — only on the first message of a sender group
-    .tail.own &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: -8px;
-        width: 0;
-        height: 0;
-        border: 6px solid transparent;
-        border-top-color: var(--bubble-sent);
-        border-right: 0;
-        border-bottom: 0;
+    // Tail corner — tighter radius on the "sender corner" only, no external triangle
+    .tail.own & {
+        border-top-right-radius: 2px;
     }
 
-    .tail.other &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -8px;
-        width: 0;
-        height: 0;
-        border: 6px solid transparent;
-        border-top-color: var(--bubble-received);
-        border-left: 0;
-        border-bottom: 0;
+    .tail.other & {
+        border-top-left-radius: 2px;
     }
 
-    // When NOT a tail message, restore full border radius on the "tail" corner
+    // Non-tail messages keep full radius on all corners
     .own:not(.tail) & {
         border-top-right-radius: 10px;
     }
@@ -268,6 +250,20 @@
         50% {
             opacity: 0.8;
         }
+    }
+}
+
+.failedIcon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--danger, #ef4444);
+    opacity: 0.9;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+
+    &:hover {
+        opacity: 1;
+        transform: scale(1.1);
     }
 }
 

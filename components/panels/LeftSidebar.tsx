@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
@@ -54,15 +54,43 @@ export default function LeftSidebar() {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
   const filteredChats = useMemo(() => {
-    if (!searchQuery.trim()) return chats;
-    const q = searchQuery.toLowerCase();
-    return chats.filter((chat) => {
-      if (chat.type === 'dm') {
-        return chat.dm_user?.display_name.toLowerCase().includes(q);
-      }
-      return chat.name?.toLowerCase().includes(q);
+    const filtered = !searchQuery.trim() ? chats : chats.filter((chat) => {
+      if (chat.type === 'dm') return chat.dm_user?.display_name.toLowerCase().includes(searchQuery.toLowerCase());
+      return chat.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+    // Pinned chats always appear first
+    return [...filtered].sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return 0;
     });
   }, [chats, searchQuery]);
+
+  const handlePinChat = useCallback((chatId: string, currentlyPinned: boolean) => {
+    if (!currentUser) return;
+    const newPinned = !currentlyPinned;
+    // Update store immediately
+    useAppStore.setState((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === chatId ? { ...c, is_pinned: newPinned } : c
+      ),
+    }));
+    // Persist in localStorage (works without SQL patch)
+    try {
+      const key = `pinned_chats_${currentUser.id}`;
+      const stored: Record<string, boolean> = JSON.parse(localStorage.getItem(key) || '{}');
+      stored[chatId] = newPinned;
+      localStorage.setItem(key, JSON.stringify(stored));
+    } catch { /* ignore */ }
+    // Also try Supabase silently (if patch 009 has been run)
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.from('chat_participants')
+        .update({ is_pinned: newPinned })
+        .eq('chat_id', chatId)
+        .eq('user_id', currentUser.id)
+        .then(() => { /* silent */ });
+    });
+  }, [currentUser]);
 
   const isWorkspaceUser = (currentUser?.role_weight ?? 0) >= 20;
   const isAdmin = (currentUser?.role_weight ?? 0) >= 200;
@@ -153,7 +181,7 @@ export default function LeftSidebar() {
           return (
             <button
               key={chat.id}
-              className={`${styles.chatItem} ${isActive ? styles.active : ''}`}
+              className={`${styles.chatItem} ${isActive ? styles.active : ''} ${chat.is_pinned ? styles.pinnedChat : ''}`}
               onClick={() => openChat(chat)}
             >
               <div className={styles.chatAvatarWrapper}>
@@ -168,7 +196,10 @@ export default function LeftSidebar() {
               </div>
               <div className={styles.chatInfo}>
                 <div className={styles.chatTop}>
-                  <span className={styles.chatName}>{displayName}</span>
+                  <span className={styles.chatName}>
+                    {chat.is_pinned && <span className={styles.pinIndicator}>📌</span>}
+                    {displayName}
+                  </span>
                   <span className={styles.chatTime}>
                     {formatTime(chat.last_message_time)}
                   </span>
@@ -176,6 +207,16 @@ export default function LeftSidebar() {
                 <p className={styles.chatPreview}>
                   {chat.last_message || 'No messages yet'}
                 </p>
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                className={styles.chatPinBtn}
+                title={chat.is_pinned ? 'Unpin chat' : 'Pin chat'}
+                onClick={(e) => { e.stopPropagation(); handlePinChat(chat.id, !!chat.is_pinned); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handlePinChat(chat.id, !!chat.is_pinned); } }}
+              >
+                {chat.is_pinned ? '📌' : '📍'}
               </div>
             </button>
           );
