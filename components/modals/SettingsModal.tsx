@@ -173,12 +173,16 @@ export default function SettingsModal() {
 
         try {
             const encrypted = await encryptMessage(feedbackText.trim());
-            const { error } = await supabase.from('feedback').insert({
-                user_id: currentUser.id,
-                message: encrypted,
+            const res = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUser.id,
+                    message: encrypted,
+                }),
             });
 
-            if (error) throw error;
+            if (!res.ok) throw new Error('Failed to submit feedback');
             setFeedbackSent(true);
             setFeedbackText('');
             setTimeout(() => setFeedbackSent(false), 3000);
