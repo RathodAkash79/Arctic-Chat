@@ -17,61 +17,37 @@ export function useChats() {
 
     // Fetch all chats the user participates in
     const fetchChats = useCallback(async () => {
-        if (!currentUser) {
-            console.log('[fetchChats] No currentUser, skipping');
-            return;
-        }
+        if (!currentUser) return;
 
-        console.log('[fetchChats] Fetching for user:', currentUser.id);
-
-        // 1. Get chat_ids the user is in
-        const { data: participantRows, error: pErr } = await supabase
-            .from('chat_participants')
-            .select('chat_id')
-            .eq('user_id', currentUser.id);
-
-        console.log('[fetchChats] Step 1 - Participant rows:', participantRows?.length, 'Error:', pErr?.message);
-
-        if (pErr || !participantRows?.length) {
-            setChats([]);
-            return;
-        }
-
-        const chatIds = participantRows.map((p) => p.chat_id);
-        console.log('[fetchChats] Chat IDs:', chatIds);
-
-        // 2. Fetch chats
-        const { data: chatRows, error: cErr } = await supabase
-            .from('chats')
-            .select('*')
-            .in('id', chatIds)
-            .order('last_message_time', { ascending: false, nullsFirst: true });
-
-        console.log('[fetchChats] Step 2 - Chat rows:', chatRows?.length, 'Error:', cErr?.message);
-
-        if (cErr || !chatRows) {
-            setChats([]);
-            return;
-        }
-
-        // 3. Fetch all participants for these chats via SECURITY DEFINER function
-        //    (Direct query causes RLS infinite recursion — this bypasses it)
+        // Step 1 & 2 in parallel with Step 3
+        // We fetch the chat details (via inner join to confirm membership) 
+        // and all participants (via RPC) simultaneously.
         interface RpcParticipant { chat_id: string; user_id: string; group_role: string; joined_at: string }
-        const { data: allParticipants } = await supabase.rpc('get_my_chat_participants') as { data: RpcParticipant[] | null };
 
-        console.log('[fetchChats] Step 3 - All participants:', allParticipants?.length);
+        const [chatsRes, participantsRes] = await Promise.all([
+            supabase
+                .from('chats')
+                .select(`
+                    *,
+                    chat_participants!inner(user_id)
+                `)
+                .eq('chat_participants.user_id', currentUser.id)
+                .order('last_message_time', { ascending: false, nullsFirst: true }),
+            supabase.rpc('get_my_chat_participants') as unknown as Promise<{ data: RpcParticipant[] | null }>
+        ]);
 
-        // 4. Fetch user info for all participants
-        const participantUserIds = [
-            ...new Set((allParticipants || []).map((p: RpcParticipant) => p.user_id)),
-        ];
+        const chatRows = chatsRes.data || [];
+        const allParticipants = participantsRes.data || [];
 
-        const { data: users } = await supabase
-            .from('users')
-            .select('*')
-            .in('id', participantUserIds);
+        if (chatsRes.error || !chatRows.length) {
+            setChats([]);
+            return;
+        }
 
-        console.log('[fetchChats] Step 4 - Users:', users?.length);
+        // Step 4: Fetch user info for all participants
+        const participantUserIds = [...new Set(allParticipants.map(p => p.user_id))];
+        const { data: users } = await supabase.from('users').select('*').in('id', participantUserIds);
+
 
         const usersMap = new Map((users || []).map((u) => {
             const user = u as User;
@@ -79,11 +55,11 @@ export function useChats() {
             return [user.id, user];
         }));
 
-        // 5. Build ChatListItem array
+        // Step 5: Build ChatListItem array
         const chatList: ChatListItem[] = chatRows.map((chat) => {
-            const participants: ChatParticipant[] = (allParticipants || [])
-                .filter((p: RpcParticipant) => p.chat_id === chat.id)
-                .map((p: RpcParticipant) => ({
+            const participants: ChatParticipant[] = ((allParticipants || []) as RpcParticipant[])
+                .filter((p) => p.chat_id === chat.id)
+                .map((p) => ({
                     chat_id: p.chat_id,
                     user_id: p.user_id,
                     group_role: p.group_role as ChatParticipant['group_role'],
@@ -91,12 +67,9 @@ export function useChats() {
                     user: usersMap.get(p.user_id),
                 }));
 
-            // For DMs, resolve the other user
             let dm_user: User | undefined;
             if (chat.type === 'dm') {
-                const otherParticipant = participants.find(
-                    (p) => p.user_id !== currentUser.id
-                );
+                const otherParticipant = participants.find((p) => p.user_id !== currentUser.id);
                 dm_user = otherParticipant?.user;
             }
 
@@ -104,7 +77,6 @@ export function useChats() {
                 ...chat,
                 participants,
                 dm_user,
-                // Read pin state from localStorage (always works), fallback to DB column
                 is_pinned: (() => {
                     try {
                         const stored = JSON.parse(localStorage.getItem(`pinned_chats_${currentUser.id}`) || '{}');
@@ -115,22 +87,20 @@ export function useChats() {
             } as ChatListItem;
         });
 
-        console.log('[fetchChats] Final chat list:', chatList.length);
         setChats(chatList);
 
-        // SYNC CURRENT CHAT: If a chat is open, update its reference from the new list
-        // This ensures participant lists and roles refresh in real-time after moderation commands
+        // SYNC CURRENT CHAT: update its reference from the new list
         const state = useAppStore.getState();
         if (state.currentChat) {
             const updated = chatList.find(c => c.id === state.currentChat?.id);
             if (updated) {
                 state.setCurrentChat(updated);
             } else {
-                // If the user was removed from the chat they were viewing
                 state.setCurrentChat(null);
             }
         }
     }, [currentUser, setChats]);
+
 
     // Initial fetch
     useEffect(() => {

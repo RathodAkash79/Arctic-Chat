@@ -101,11 +101,11 @@ export function useMessages() {
         );
     }, []);
 
-    // ── Fetch latest messages for current chat (with 7s timeout) ────
+    // ── Fetch latest messages for current chat ────
     const fetchMessages = useCallback(
         async (chatId: string) => {
             fetchingForChatId.current = chatId;
-            // Clear immediately so previous chat's messages never show in new chat
+            // Clear previous chat messages; pending optimistic ones for THIS chat stay via addMessage
             setMessages([]);
             setLoadingMessages(true);
             setHasMore(true);
@@ -140,17 +140,32 @@ export function useMessages() {
                 // Final guard after async decrypt
                 if (fetchingForChatId.current !== chatId) return;
 
-                // Inject offline queue
-                const user = useAppStore.getState().currentUser;
-                const offlineQ = getOfflineQueue(user?.id || '').filter(i => i.optimistic.chat_id === chatId);
-                // Initialize as pending if we're found in the queue; processOfflineQueue will take over
-                const offlineMsgs = offlineQ.map(i => ({ ...i.optimistic, is_pending: true, is_failed: false }));
+                // ── Cleanup Offline Queue ──
+                // If a message we just fetched from the DB is also in our offline queue,
+                // remove it from the queue because it's officially persisted.
+                const userId = useAppStore.getState().currentUser?.id;
+                if (userId) {
+                    const queue = getOfflineQueue(userId);
+                    let queueModified = false;
+                    const cleanQueue = queue.filter(item => {
+                        const inDB = decrypted.some(d => d.id === item.optimistic.id);
+                        if (inDB) queueModified = true;
+                        return !inDB;
+                    });
+                    if (queueModified) {
+                        localStorage.setItem(`offline_messages_${userId}`, JSON.stringify(cleanQueue));
+                    }
+                }
 
-                // Avoid duplicating messages that might have actually sent but stayed in the queue due to a race condition
-                const existingIds = new Set(decrypted.map(m => m.id));
-                const uniqueOffline = offlineMsgs.filter(m => !existingIds.has(m.id));
+                // ── Re-inject remaining offline-queued messages as pending bubbles ──
+                const pendingBubbles: Message[] = userId
+                    ? getOfflineQueue(userId)
+                        .filter(i => i.optimistic.chat_id === chatId)
+                        .filter(i => !decrypted.some(d => d.id === i.optimistic.id))
+                        .map(i => ({ ...i.optimistic, is_pending: true, is_failed: false }))
+                    : [];
 
-                setMessages([...decrypted, ...uniqueOffline]);
+                setMessages([...decrypted, ...pendingBubbles]);
                 setHasMore(raw.length >= PAGE_SIZE);
                 setLoadingMessages(false);
                 setFetchError(false);
@@ -164,7 +179,7 @@ export function useMessages() {
         [setMessages, decryptBatch]
     );
 
-    // ── Process Offline Queue ───────────────────────────────────────
+    // ── Process Offline Queue — re-injects pending bubbles and sends ──
     const processOfflineQueue = useCallback(async () => {
         const user = useAppStore.getState().currentUser;
         if (!user) return;
@@ -172,46 +187,80 @@ export function useMessages() {
         const q = getOfflineQueue(user.id);
         if (!q.length) return;
 
-        console.log(`[OfflineQueue] Processing ${q.length} pending messages...`);
+        console.log(`[OfflineQueue] Retrying ${q.length} pending messages...`);
 
-        // We use a simple loop but await each to avoid hammering or out-of-order 
-        // (though Supabase/RLS handles concurrency well, order matters for chat)
         for (const item of q) {
-            try {
-                // Ensure UI shows pending
+            // ── Ensure the pending bubble is visible with a spinner ──
+            // If fetchMessages cleared the list (tab switch, refresh), re-add the bubble
+            // so the user always sees the message with a sending indicator.
+            const state = useAppStore.getState();
+            const isSameChat = state.currentChat?.id === item.optimistic.chat_id;
+            const alreadyVisible = state.messages.some(m => m.id === item.optimistic.id);
+            if (isSameChat && !alreadyVisible) {
                 useAppStore.setState(s => ({
-                    messages: s.messages.map(m =>
-                        m.id === item.optimistic.id ? { ...m, is_pending: true, is_failed: false } : m
-                    )
+                    messages: [...s.messages, { ...item.optimistic, is_pending: true, is_failed: false }]
                 }));
+            }
+
+            try {
+                // ── Re-encrypt text before sending ──────────────────────────
+                // The queued payload may have been saved with plaintext (when the page
+                // was refreshed before encryption completed). Re-encrypt here if needed.
+                let sendPayload = { ...item.payload };
+                const rawText = item.optimistic.text;
+                if (
+                    hasPassphrase() &&
+                    rawText &&
+                    rawText !== '[Media]' &&
+                    rawText !== '[deleted]'
+                ) {
+                    try {
+                        sendPayload = { ...sendPayload, text: await encryptMessage(rawText) };
+                    } catch {
+                        // encryption failed — send as-is (plaintext fallback)
+                    }
+                }
 
                 const { error } = await withTimeout(
-                    Promise.resolve(supabase.from('messages').insert(item.payload)),
+                    Promise.resolve(supabase.from('messages').upsert(sendPayload, {
+                        onConflict: 'id',
+                        ignoreDuplicates: true,   // if sendToDB already persisted it, just skip
+                    })),
                     SEND_TIMEOUT
                 );
 
-                if (!error) {
+                const isConflict = (error as any)?.code === '23505';
+                if (!error || isConflict) {
+                    if (isConflict) {
+                        console.log('[OfflineQueue] Message already exists in DB, clearing from queue');
+                    }
+                    // Remove from localStorage — sent successfully or already exists
                     removeFromOfflineQueue(user.id, item.optimistic.id);
-                    // Update state to confirm sent
+                    // Mark bubble as confirmed in place
                     useAppStore.setState(s => ({
                         messages: s.messages.map(m =>
-                            m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: false } : m
+                            m.id === item.optimistic.id
+                                ? { ...m, is_pending: false, is_failed: false }
+                                : m
                         )
                     }));
                 } else {
                     console.error('[OfflineQueue] Send error:', error.message);
-                    // Mark as failed so user can see/retry if auto-retry keeps failing
                     useAppStore.setState(s => ({
                         messages: s.messages.map(m =>
-                            m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: true } : m
+                            m.id === item.optimistic.id
+                                ? { ...m, is_pending: false, is_failed: true }
+                                : m
                         )
                     }));
                 }
             } catch (e) {
-                console.error('[OfflineQueue] Timeout/Network error:', e);
+                console.error('[OfflineQueue] Will retry later:', e);
                 useAppStore.setState(s => ({
                     messages: s.messages.map(m =>
-                        m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: true } : m
+                        m.id === item.optimistic.id
+                            ? { ...m, is_pending: false, is_failed: true }
+                            : m
                     )
                 }));
             }
@@ -219,9 +268,12 @@ export function useMessages() {
     }, []);
 
     useEffect(() => {
+        // Run immediately on mount (handles page refresh case)
         processOfflineQueue();
 
+        // Re-run when network comes back
         const handleOnline = () => processOfflineQueue();
+        // Re-run when user returns to this tab — read currentChat fresh from store
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
                 processOfflineQueue();
@@ -295,30 +347,11 @@ export function useMessages() {
             if (!currentUser || !currentChat) return;
             if (!text.trim() && !mediaUrl) return;
 
-            // ── Guard: Check timeout/mute status ───────────────────────
-            try {
-                const { data: status, error: statusError } = await supabase.rpc('get_user_group_status', {
-                    p_chat_id: currentChat.id
-                });
-
-                if (statusError) throw statusError;
-
-                if (status.is_timed_out) {
-                    const until = new Date(status.timed_until).toLocaleTimeString();
-                    onStatusError?.(`🚫 You are timed out until ${until}`);
-                    return;
-                }
-
-                if (status.is_muted) {
-                    onStatusError?.(`🔇 You are muted in this group and cannot send messages.`);
-                    return;
-                }
-            } catch (err) {
-                console.warn('[Guard] Failed to verify group status:', err);
-            }
-
             setSendingMessage(true);
 
+            // ── Step 1: Show optimistic bubble INSTANTLY ─────────────────
+            // The message appears in the UI with a spinner the moment Send is pressed,
+            // before any network calls. If the status check later rejects it, we roll back.
             const msgId = typeof crypto !== 'undefined' && crypto.randomUUID
                 ? crypto.randomUUID()
                 : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -328,7 +361,6 @@ export function useMessages() {
 
             const now = new Date().toISOString();
 
-            // Optimistic UI update immediately (plaintext)
             const optimisticMsg: Message = {
                 id: msgId,
                 chat_id: currentChat.id,
@@ -340,9 +372,11 @@ export function useMessages() {
                 expires_at: isDisappearing ? new Date(Date.now() + 86400000).toISOString() : undefined,
                 mentions: mentions || [],
                 created_at: now,
-                is_pending: true,  // show sending indicator
+                is_pending: true,  // show spinner immediately
                 ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
+
+            // Add to UI immediately (spinner visible right away)
             addMessage(optimisticMsg);
 
             // Optimistic chat list update
@@ -352,7 +386,64 @@ export function useMessages() {
                 now
             );
 
-            // Encrypt the text before storing
+            // ── Step 2: Save to localStorage IMMEDIATELY ────────────────
+            // Build a plaintext payload now so it survives a refresh at any point.
+            // processOfflineQueue will re-encrypt before sending if a passphrase is set.
+            const plaintextPayload: Record<string, unknown> = {
+                id: msgId,
+                chat_id: currentChat.id,
+                sender_id: currentUser.id,
+                text: text || (mediaUrl ? '[Media]' : ''),  // plaintext — encrypted later
+                created_at: now,
+                ...(mentions && mentions.length > 0 ? { mentions } : {}),
+                ...(replyToId ? { reply_to_id: replyToId } : {}),
+                ...(mediaUrl ? {
+                    media_url: mediaUrl,
+                    is_compressed: true,
+                    is_disappearing: isDisappearing || false,
+                    ...(isDisappearing ? { expires_at: new Date(Date.now() + 86400000).toISOString() } : {}),
+                } : {}),
+            };
+            // Save NOW — before any async work — so a refresh always finds this message
+            saveToOfflineQueue(currentUser.id, { optimistic: optimisticMsg, payload: plaintextPayload });
+
+            // ── Step 3: Status guard (runs after bubble is shown) ────────
+            // If the user is muted/timed-out, remove the bubble (rollback) and show error.
+            try {
+                const { data: status, error: statusError } = await supabase.rpc('get_user_group_status', {
+                    p_chat_id: currentChat.id
+                });
+
+                if (statusError) throw statusError;
+
+                if (status.is_timed_out) {
+                    const until = new Date(status.timed_until).toLocaleTimeString();
+                    onStatusError?.(`🚫 You are timed out until ${until}`);
+                    // Rollback: remove the bubble AND the queue entry
+                    useAppStore.setState(s => ({
+                        messages: s.messages.filter(m => m.id !== msgId)
+                    }));
+                    removeFromOfflineQueue(currentUser.id, msgId);
+                    setSendingMessage(false);
+                    return;
+                }
+
+                if (status.is_muted) {
+                    onStatusError?.(`🔇 You are muted in this group and cannot send messages.`);
+                    // Rollback: remove the bubble AND the queue entry
+                    useAppStore.setState(s => ({
+                        messages: s.messages.filter(m => m.id !== msgId)
+                    }));
+                    removeFromOfflineQueue(currentUser.id, msgId);
+                    setSendingMessage(false);
+                    return;
+                }
+            } catch (err) {
+                // If status check fails, let the send proceed (non-group chats, etc.)
+                console.warn('[Guard] Failed to verify group status:', err);
+            }
+
+            // ── Step 4: Encrypt + build final send payload ────────────────
             let encryptedText = '';
             if (text.trim()) {
                 try {
@@ -373,7 +464,6 @@ export function useMessages() {
                 sender_id: currentUser.id,
                 text: encryptedText || (mediaUrl ? '[Media]' : ''),
                 created_at: now,
-                // Only include these columns if they have values
                 ...(mentions && mentions.length > 0 ? { mentions } : {}),
                 ...(replyToId ? { reply_to_id: replyToId } : {}),
             };
@@ -387,7 +477,8 @@ export function useMessages() {
                 }
             }
 
-            // ── Save to local queue + Send with timeout ────────────────
+            // Update queue entry with the now-encrypted payload
+            removeFromOfflineQueue(currentUser.id, msgId);
             saveToOfflineQueue(currentUser.id, { optimistic: optimisticMsg, payload });
 
             const sendToDB = async () => {
@@ -558,7 +649,7 @@ export function useMessages() {
         }
         if (!currentUser) return;
         fetchMessages(currentChat.id);
-    }, [currentChat?.id, currentUser?.id, fetchMessages, setMessages]);
+    }, [currentChat?.id, currentUser?.id, fetchMessages]);
 
     useEffect(() => {
         if (!currentChat) return;
