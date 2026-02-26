@@ -117,6 +117,19 @@ export function useChats() {
 
         console.log('[fetchChats] Final chat list:', chatList.length);
         setChats(chatList);
+
+        // SYNC CURRENT CHAT: If a chat is open, update its reference from the new list
+        // This ensures participant lists and roles refresh in real-time after moderation commands
+        const state = useAppStore.getState();
+        if (state.currentChat) {
+            const updated = chatList.find(c => c.id === state.currentChat?.id);
+            if (updated) {
+                state.setCurrentChat(updated);
+            } else {
+                // If the user was removed from the chat they were viewing
+                state.setCurrentChat(null);
+            }
+        }
     }, [currentUser, setChats]);
 
     // Initial fetch

@@ -12,6 +12,7 @@ import {
   ChevronDown,
   X as XIcon,
   AlertCircle,
+  Pin,
 } from 'lucide-react';
 import styles from './MiddlePanel.module.scss';
 
@@ -31,6 +32,7 @@ export default function MiddlePanel() {
     loadingMessages,
     hasMore,
     sendMessage,
+    sendSystemMessage,
     sendTypingEvent,
     loadMore,
     fetchError,
@@ -290,7 +292,7 @@ export default function MiddlePanel() {
           }}
           style={{ cursor: 'pointer' }}
         >
-          <span className={styles.pinnedIcon}>📌</span>
+          <span className={styles.pinnedIcon}><Pin size={16} /></span>
           <div className={styles.pinnedContent}>
             <span className={styles.pinnedLabel}>
               {pinnedMessages.length > 1
@@ -320,7 +322,7 @@ export default function MiddlePanel() {
         <div className={styles.pinnedModalOverlay} onClick={() => setShowPinnedModal(false)}>
           <div className={styles.pinnedModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.pinnedModalHeader}>
-              <span>📌 Pinned Messages</span>
+              <span><Pin size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Pinned Messages</span>
               <button onClick={() => setShowPinnedModal(false)}>×</button>
             </div>
             <div className={styles.pinnedModalList}>
@@ -334,8 +336,9 @@ export default function MiddlePanel() {
                   }}
                   style={{ cursor: 'pointer' }}
                 >
+                  <Pin size={12} className={styles.modalPinIcon} />
                   <span className={styles.pinnedModalText}>
-                    {m.media_url ? '📷 Photo' : m.text}
+                    {m.media_url ? '📷 Photo' : (m.text?.slice(0, 100) || '')}
                   </span>
                   <button
                     className={styles.pinnedModalUnpin}
@@ -382,25 +385,66 @@ export default function MiddlePanel() {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            isOwn={groupedProps[i].isOwn}
-            showName={groupedProps[i].showName}
-            showTail={groupedProps[i].showTail}
-            isGroup={currentChat.type === 'group'}
-            onReply={async (msg) => {
-              setReplyTo(msg);
-              const { decryptMessage } = await import('@/lib/crypto');
-              const plain = await decryptMessage(msg.text).catch(() => msg.text);
-              setReplyToDecrypted(msg.media_url ? '📷 Photo' : plain);
-            }}
-            onEditRequest={(msg, decryptedText) => setEditingMessage({ id: msg.id, text: decryptedText })}
-            onPin={(msg) => handlePin(msg.id)}
-            isPinned={pinnedIds.includes(msg.id)}
-          />
-        ))}
+        {messages.reduce<React.ReactNode[]>((acc, msg, i) => {
+          // Date separator logic
+          const msgDate = new Date(msg.created_at);
+          const prevDate = i > 0 ? new Date(messages[i - 1].created_at) : null;
+          const isDifferentDay = !prevDate ||
+            msgDate.getDate() !== prevDate.getDate() ||
+            msgDate.getMonth() !== prevDate.getMonth() ||
+            msgDate.getFullYear() !== prevDate.getFullYear();
+
+          if (isDifferentDay) {
+            const todayDate = new Date();
+            const todayStr = todayDate.toDateString();
+
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(todayDate.getDate() - 1);
+            const yesterdayStr = yesterdayDate.toDateString();
+
+            const msgDateStr = msgDate.toDateString();
+            let label: string;
+
+            if (msgDateStr === todayStr) {
+              label = 'Today';
+            } else if (msgDateStr === yesterdayStr) {
+              label = 'Yesterday';
+            } else {
+              const opts: Intl.DateTimeFormatOptions = {
+                day: 'numeric',
+                month: 'short',
+                ...(msgDate.getFullYear() !== todayDate.getFullYear() ? { year: 'numeric' } : {}),
+              };
+              label = msgDate.toLocaleDateString(undefined, opts);
+            }
+            acc.push(
+              <div key={`sep-${msg.id}`} className={styles.dateSeparator}>
+                <span>{label}</span>
+              </div>
+            );
+          }
+
+          acc.push(
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isOwn={groupedProps[i].isOwn}
+              showName={groupedProps[i].showName}
+              showTail={groupedProps[i].showTail}
+              isGroup={currentChat.type === 'group'}
+              onReply={async (msg) => {
+                setReplyTo(msg);
+                const { decryptMessage } = await import('@/lib/crypto');
+                const plain = await decryptMessage(msg.text).catch(() => msg.text);
+                setReplyToDecrypted(msg.media_url ? '📷 Photo' : plain);
+              }}
+              onEditRequest={(msg, decryptedText) => setEditingMessage({ id: msg.id, text: decryptedText })}
+              onPin={(msg) => handlePin(msg.id)}
+              isPinned={pinnedIds.includes(msg.id)}
+            />
+          );
+          return acc;
+        }, [])}
 
         <div ref={messagesEndRef} />
       </div>
@@ -459,10 +503,25 @@ export default function MiddlePanel() {
         chatId={currentChat.id}
         participants={currentChat.participants || []}
         callerGroupRole={currentChat.type === 'group' ? currentChat.participants?.find((p) => p.user_id === currentUser?.id)?.group_role : undefined}
+        onSystemMessage={(msg) => {
+          // Send a real E2E encrypted system message with is_system=true
+          sendSystemMessage(msg);
+        }}
         editingMessage={editingMessage}
         onEditSave={async (id, newText) => {
           const { supabase } = await import('@/lib/supabase');
           const { encryptMessage } = await import('@/lib/crypto');
+
+          // 1. Get the current (old) state to preserve in history
+          const oldMsg = useAppStore.getState().messages.find(m => m.id === id);
+          if (oldMsg && oldMsg.text !== '[Media]') {
+            await supabase.from('message_edit_history').insert({
+              message_id: id,
+              old_text: oldMsg.text, // Already encrypted in store
+              edited_at: new Date().toISOString()
+            });
+          }
+
           const encrypted = await encryptMessage(newText).catch(() => newText);
           const { error } = await supabase
             .from('messages')

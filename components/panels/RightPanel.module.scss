@@ -300,3 +300,46 @@
     cursor: not-allowed;
   }
 }
+
+.unbanBtn {
+  background: transparent;
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--accent-primary);
+    color: white;
+  }
+}
+
+.banReason {
+  font-size: 0.75rem;
+  color: var(--error-msg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.loadingSmall {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: $text-sm;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 1rem 0;
+  margin: 0;
+}

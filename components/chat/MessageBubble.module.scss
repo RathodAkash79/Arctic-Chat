@@ -1,5 +1,35 @@
 @import '../../styles/_variables';
 
+// ── System Messages ──
+.systemWrapper {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    margin: 0.25rem 0;
+    width: 100%;
+}
+
+.systemPill {
+    background: rgba(14, 165, 233, 0.08);
+    color: var(--accent-primary);
+    border: 1px solid rgba(14, 165, 233, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-align: center;
+    max-width: 90%;
+    line-height: 1.5;
+    white-space: pre-wrap; // Fix for /help multi-line
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+    strong,
+    b {
+        color: var(--text-primary);
+        font-weight: 700;
+    }
+}
+
 .wrapper {
     display: flex;
     padding: 1px 1rem;
@@ -100,38 +130,86 @@
 
 .dropdownMenu {
     position: absolute;
-    right: 0;
-    top: 100%;
+    top: calc(100% + 4px);
     background: var(--bg-secondary);
     border: 1px solid var(--border-light);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
-    min-width: 120px;
-    padding: 0.25rem 0;
-    overflow: hidden;
+    min-width: 145px;
+    padding: 6px;
+    gap: 2px;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    animation: menuFadeIn 0.15s ease-out;
+
+    @keyframes menuFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    &.menuOwn {
+        right: 0;
+    }
+
+    &.menuOther {
+        left: 0;
+    }
 
     button {
-        padding: 0.5rem 1rem;
+        padding: 8px 10px;
         text-align: left;
         background: none;
         border: none;
-        color: var(--text-primary);
-        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-size: 0.82rem;
+        font-weight: 500;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 6px;
+        transition: all 0.15s ease;
+
+        svg {
+            color: var(--accent-primary);
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
 
         &:hover {
             background: var(--bg-hover);
+            color: var(--text-primary);
+
+            svg {
+                opacity: 1;
+                transform: scale(1.1);
+            }
         }
     }
 
     .dangerItem {
-        color: var(--danger);
+        color: var(--danger, #ef4444);
+
+        svg {
+            color: var(--danger, #ef4444);
+        }
 
         &:hover {
             color: white;
             background: var(--danger);
+
+            svg {
+                color: white;
+            }
         }
     }
 }
@@ -247,18 +325,16 @@
 .pendingIcon {
     display: inline-flex;
     align-items: center;
-    opacity: 0.5;
-    animation: pendingPulse 1.2s ease-in-out infinite;
+    opacity: 0.6;
+    animation: pendingSpin 1s linear infinite;
 
-    @keyframes pendingPulse {
-
-        0%,
-        100% {
-            opacity: 0.4;
+    @keyframes pendingSpin {
+        from {
+            transform: rotate(0deg);
         }
 
-        50% {
-            opacity: 0.8;
+        to {
+            transform: rotate(360deg);
         }
     }
 }

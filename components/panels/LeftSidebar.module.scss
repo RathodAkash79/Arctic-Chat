@@ -395,17 +395,23 @@
 // ============================================
 
 .chatPinBtn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   background: none;
   border: none;
-  font-size: 0.85rem;
   cursor: pointer;
   opacity: 0;
   padding: 4px 6px;
-  min-height: unset; // override global 44px min-height for this small icon
   border-radius: 4px;
-  transition: opacity 0.15s, background 0.15s;
-  margin-left: auto;
+  color: var(--text-tertiary);
+  transition: all 0.15s ease;
+
+  svg {
+    transition: transform 0.2s ease;
+  }
 
   // Show on hover (desktop)
   .chatItem:hover & {
@@ -419,6 +425,11 @@
 
   &:hover {
     background: var(--bg-hover);
+    color: var(--accent-primary);
+
+    svg {
+      transform: scale(1.1);
+    }
   }
 }
 
@@ -427,9 +438,17 @@
 }
 
 .pinIndicator {
-  font-size: 0.75rem;
-  margin-right: 3px;
-  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  color: var(--accent-primary);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.3));
+
+  svg {
+    transform: rotate(45deg);
+  }
 }
 
 // ============================================

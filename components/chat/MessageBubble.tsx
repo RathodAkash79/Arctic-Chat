@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveImageUrl } from '@/lib/utils';
 import type { Message, MessageEditHistory } from '@/types';
-import { ChevronDown, Clock, AlertCircle } from 'lucide-react';
+import { ChevronDown, AlertCircle, Reply, Edit2, Trash2, Pin, PinOff, History, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { decryptMessage } from '@/lib/crypto';
 import styles from './MessageBubble.module.scss';
@@ -153,9 +153,29 @@ export default function MessageBubble({
 
     const handleDelete = useCallback(async () => {
         if (!canDelete) return;
+
+        // If it has media, delete from storage first
+        if (message.media_url) {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    await fetch('/api/media/delete', {
+                        method: 'POST',
+                        body: JSON.stringify({ keys: [message.media_url] }),
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to delete media from storage:', err);
+            }
+        }
+
         const { error } = await supabase
             .from('messages')
-            .update({ is_deleted: true, text: '[deleted]' })
+            .update({ is_deleted: true, text: '[deleted]', media_url: undefined })
             .eq('id', message.id);
         if (error) {
             console.error('Delete failed:', error.message, error.code, error.hint);
@@ -163,10 +183,10 @@ export default function MessageBubble({
         }
         useAppStore.setState((s) => ({
             messages: s.messages.map((m) =>
-                m.id === message.id ? { ...m, is_deleted: true, text: '[deleted]' } : m
+                m.id === message.id ? { ...m, is_deleted: true, text: '[deleted]', media_url: undefined } : m
             ),
         }));
-    }, [message.id, canDelete]);
+    }, [message.id, canDelete, message.media_url]);
 
 
     const handleShowHistory = useCallback(async () => {
@@ -257,6 +277,16 @@ export default function MessageBubble({
         });
     }, [message.mentions, router, setCurrentChat, setIsMobileChatOpen]);
 
+    if (message.is_system) {
+        return (
+            <div className={styles.systemWrapper}>
+                <div className={styles.systemPill}>
+                    {displayText || message.text}
+                </div>
+            </div>
+        );
+    }
+
     if (message.is_deleted) {
         return (
             <div className={`${styles.wrapper} ${isOwn ? styles.own : styles.other}`}>
@@ -295,20 +325,26 @@ export default function MessageBubble({
                             <ChevronDown size={14} />
                         </button>
                         {showDropdown && (
-                            <div className={styles.dropdownMenu}>
+                            <div className={`${styles.dropdownMenu} ${isOwn ? styles.menuOwn : styles.menuOther}`}>
                                 {onReply && (
                                     <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleReply(); }}>
-                                        Reply
+                                        <Reply size={14} /> <span>Reply</span>
                                     </button>
                                 )}
                                 {canEdit && (
                                     <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); onEditRequest?.(message, displayText || ''); }}>
-                                        Edit
+                                        <Edit2 size={14} /> <span>Edit</span>
+                                    </button>
+                                )}
+                                {message.edited_at && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleShowHistory(); }}>
+                                        <History size={14} /> <span>History</span>
                                     </button>
                                 )}
                                 {onPin && (
                                     <button onClick={(e) => { e.stopPropagation(); setShowDropdown(false); onPin(message); }}>
-                                        {isPinned ? '📌 Unpin' : '📌 Pin'}
+                                        {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                        <span>{isPinned ? 'Unpin' : 'Pin'}</span>
                                     </button>
                                 )}
                                 {canDelete && (
@@ -316,7 +352,7 @@ export default function MessageBubble({
                                         onClick={(e) => { e.stopPropagation(); setShowDropdown(false); handleDelete(); }}
                                         className={styles.dangerItem}
                                     >
-                                        Delete
+                                        <Trash2 size={14} /> <span>Delete</span>
                                     </button>
                                 )}
                             </div>
@@ -389,7 +425,7 @@ export default function MessageBubble({
                     <span className={styles.time}>{formatMsgTime(message.created_at)}</span>
                     {message.is_pending && isOwn && !message.is_failed && (
                         <span className={styles.pendingIcon} title="Sending...">
-                            <Clock size={10} />
+                            <Loader2 size={10} />
                         </span>
                     )}
                     {message.is_failed && isOwn && (

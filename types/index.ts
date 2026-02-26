@@ -63,6 +63,7 @@ export interface Chat {
   // Pinned message
   pinned_message_id?: string | null;
   pinned_at?: string | null;
+  slowmode_seconds?: number;
 }
 
 // Chat with resolved participant info (for sidebar rendering)
@@ -105,6 +106,7 @@ export interface Message {
   reply_to_id?: string;
   mentions?: MentionedUser[];
   link_preview?: { title?: string; description?: string; image?: string; url?: string } | null;
+  is_system?: boolean;
   created_at: string;
   sender?: User;
   // Client-only: true while waiting for DB confirmation (optimistic UI)

@@ -20,6 +20,25 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
     ]);
 }
 
+// ── Helper: delete S3 objects via proxy API ───────────────────────────
+async function deleteObjectsFromStorage(urls: string[]) {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        await fetch('/api/media/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ keys: urls }),
+        });
+    } catch (err) {
+        console.warn('[Storage] Failed to send delete request:', err);
+    }
+}
+
 // ── Offline Queue Management ─────────────────────────────────────────
 interface OfflineMessage {
     optimistic: Message;
@@ -122,8 +141,10 @@ export function useMessages() {
                 if (fetchingForChatId.current !== chatId) return;
 
                 // Inject offline queue
-                const offlineQ = getOfflineQueue(useAppStore.getState().currentUser?.id || '').filter(i => i.optimistic.chat_id === chatId);
-                const offlineMsgs = offlineQ.map(i => ({ ...i.optimistic, is_pending: false, is_failed: true }));
+                const user = useAppStore.getState().currentUser;
+                const offlineQ = getOfflineQueue(user?.id || '').filter(i => i.optimistic.chat_id === chatId);
+                // Initialize as pending if we're found in the queue; processOfflineQueue will take over
+                const offlineMsgs = offlineQ.map(i => ({ ...i.optimistic, is_pending: true, is_failed: false }));
 
                 // Avoid duplicating messages that might have actually sent but stayed in the queue due to a race condition
                 const existingIds = new Set(decrypted.map(m => m.id));
@@ -151,9 +172,13 @@ export function useMessages() {
         const q = getOfflineQueue(user.id);
         if (!q.length) return;
 
+        console.log(`[OfflineQueue] Processing ${q.length} pending messages...`);
+
+        // We use a simple loop but await each to avoid hammering or out-of-order 
+        // (though Supabase/RLS handles concurrency well, order matters for chat)
         for (const item of q) {
             try {
-                // Optimistically change to pending if in current view
+                // Ensure UI shows pending
                 useAppStore.setState(s => ({
                     messages: s.messages.map(m =>
                         m.id === item.optimistic.id ? { ...m, is_pending: true, is_failed: false } : m
@@ -167,12 +192,15 @@ export function useMessages() {
 
                 if (!error) {
                     removeFromOfflineQueue(user.id, item.optimistic.id);
+                    // Update state to confirm sent
                     useAppStore.setState(s => ({
                         messages: s.messages.map(m =>
                             m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: false } : m
                         )
                     }));
                 } else {
+                    console.error('[OfflineQueue] Send error:', error.message);
+                    // Mark as failed so user can see/retry if auto-retry keeps failing
                     useAppStore.setState(s => ({
                         messages: s.messages.map(m =>
                             m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: true } : m
@@ -180,7 +208,7 @@ export function useMessages() {
                     }));
                 }
             } catch (e) {
-                // keep failed
+                console.error('[OfflineQueue] Timeout/Network error:', e);
                 useAppStore.setState(s => ({
                     messages: s.messages.map(m =>
                         m.id === item.optimistic.id ? { ...m, is_pending: false, is_failed: true } : m
@@ -254,17 +282,40 @@ export function useMessages() {
         }
     }, [currentChat, hasMore, loadingMessages, messages, prependMessages, decryptBatch]);
 
-    // ── Send a message (text and/or media) with 5s timeout ──────────
+    // ── Send a message (text and/or media) with guards ──────────
     const sendMessage = useCallback(
         async (
             text: string,
             mediaUrl?: string,
             replyToId?: string,
             isDisappearing?: boolean,
-            mentions?: MentionedUser[]
+            mentions?: MentionedUser[],
+            onStatusError?: (error: string) => void
         ) => {
             if (!currentUser || !currentChat) return;
             if (!text.trim() && !mediaUrl) return;
+
+            // ── Guard: Check timeout/mute status ───────────────────────
+            try {
+                const { data: status, error: statusError } = await supabase.rpc('get_user_group_status', {
+                    p_chat_id: currentChat.id
+                });
+
+                if (statusError) throw statusError;
+
+                if (status.is_timed_out) {
+                    const until = new Date(status.timed_until).toLocaleTimeString();
+                    onStatusError?.(`🚫 You are timed out until ${until}`);
+                    return;
+                }
+
+                if (status.is_muted) {
+                    onStatusError?.(`🔇 You are muted in this group and cannot send messages.`);
+                    return;
+                }
+            } catch (err) {
+                console.warn('[Guard] Failed to verify group status:', err);
+            }
 
             setSendingMessage(true);
 
@@ -376,24 +427,77 @@ export function useMessages() {
         [currentUser, currentChat, addMessage, updateChatLastMessage]
     );
 
+    const sendSystemMessage = useCallback(async (text: string) => {
+        if (!currentUser || !currentChat) return;
+        const msgId = crypto.randomUUID();
+        const now = new Date().toISOString();
+
+        let encryptedText = text;
+        try {
+            encryptedText = await encryptMessage(text);
+        } catch {
+            // not encrypted, that's fine
+        }
+
+        const payload = {
+            id: msgId,
+            chat_id: currentChat.id,
+            sender_id: currentUser.id,
+            text: encryptedText,
+            is_system: true,
+            created_at: now,
+        };
+
+        // Optimistic add as system message (no pending indicator)
+        addMessage({
+            ...payload,
+            text, // plaintext for display
+            is_compressed: false,
+            is_disappearing: false,
+            is_deleted: false,
+            is_system: true,
+        } as any);
+
+        await supabase.from('messages').insert(payload);
+    }, [currentUser, currentChat, addMessage]);
+
+    // ── Nuke Chat ──────────────────────────────────────────────────
+    const nukeChat = useCallback(async () => {
+        if (!currentChat) return;
+
+        const { data, error } = await supabase.rpc('execute_group_command', {
+            p_chat_id: currentChat.id,
+            p_action: 'nuke'
+        });
+
+        if (error) {
+            console.error('Nuke failed:', error);
+            return;
+        }
+
+        if (data?.ok) {
+            setMessages([]);
+            if (data.media_urls && data.media_urls.length > 0) {
+                await deleteObjectsFromStorage(data.media_urls);
+            }
+        }
+    }, [currentChat, setMessages]);
+
     // ── Retry handler (reads from store to avoid stale closure) ─────
     useEffect(() => {
         const handleRetry = (e: Event) => {
             const customEvent = e as CustomEvent<{ msgId: string }>;
-            // Read fresh state from the store — not from closure
             const state = useAppStore.getState();
             const failedMsg = state.messages.find(m => m.id === customEvent.detail.msgId);
             const chat = state.currentChat;
             if (!failedMsg || !chat) return;
 
-            // Re-mark as pending
             useAppStore.setState((s) => ({
                 messages: s.messages.map((m) =>
                     m.id === failedMsg.id ? { ...m, is_pending: true, is_failed: false } : m
                 ),
             }));
 
-            // Re-encrypt and retry with 5s timeout
             const retrySend = async () => {
                 let textPayload = failedMsg.text;
                 if (hasPassphrase() && textPayload && textPayload !== '[Media]' && textPayload !== '[deleted]') {
@@ -445,20 +549,17 @@ export function useMessages() {
 
         window.addEventListener('retry-message', handleRetry);
         return () => window.removeEventListener('retry-message', handleRetry);
-    }, []); // No deps needed — reads from store directly
+    }, []);
 
-    // ── Fetch messages when chat changes ────────────────────────────
     useEffect(() => {
         if (!currentChat) {
             setMessages([]);
             return;
         }
-        // Require currentUser to be resolved before fetching
         if (!currentUser) return;
         fetchMessages(currentChat.id);
     }, [currentChat?.id, currentUser?.id, fetchMessages, setMessages]);
 
-    // ── Realtime subscription with health monitoring ────────────────
     useEffect(() => {
         if (!currentChat) return;
 
@@ -478,7 +579,6 @@ export function useMessages() {
                 },
                 async (payload) => {
                     const newMsg = payload.new as Message;
-                    // Skip own optimistic message (already in store)
                     if (newMsg.sender_id === useAppStore.getState().currentUser?.id) return;
                     if (hasPassphrase()) {
                         newMsg.text = await decryptMessage(newMsg.text);
@@ -505,14 +605,11 @@ export function useMessages() {
                 }
             )
             .subscribe((status) => {
-                // ── Channel health monitoring ───────────────────────
                 if (status === 'SUBSCRIBED') {
                     channelHealthy.current = true;
                 }
                 if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                    console.warn('[Realtime] Channel issue:', status, '— will reconnect in 2s');
                     channelHealthy.current = false;
-                    // Auto-reconnect after 2s by bumping reconnectCount
                     setTimeout(() => {
                         if (channelRef.current) {
                             supabase.removeChannel(channelRef.current);
@@ -561,7 +658,6 @@ export function useMessages() {
         };
     }, [currentChat?.id, addMessage, setTypingUsers, reconnectCount]);
 
-    // ── Broadcast typing state ──────────────────────────────────────
     const sendTypingEvent = useCallback(async (isTyping: boolean) => {
         if (!typingChannelRef.current || !currentUser) return;
         await typingChannelRef.current.send({
@@ -579,7 +675,10 @@ export function useMessages() {
         fetchError,
         loadMore,
         sendMessage,
+        sendSystemMessage,
+        nukeChat,
         sendTypingEvent,
         retryFetch,
+        deleteObjectsFromStorage,
     };
 }

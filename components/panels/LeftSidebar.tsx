@@ -17,6 +17,8 @@ import {
   Users,
   Shield,
   LayoutDashboard,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import styles from './LeftSidebar.module.scss';
 
@@ -197,7 +199,7 @@ export default function LeftSidebar() {
               <div className={styles.chatInfo}>
                 <div className={styles.chatTop}>
                   <span className={styles.chatName}>
-                    {chat.is_pinned && <span className={styles.pinIndicator}>📌</span>}
+                    {chat.is_pinned && <span className={styles.pinIndicator}><Pin size={10} /></span>}
                     {displayName}
                   </span>
                   <span className={styles.chatTime}>
@@ -216,7 +218,7 @@ export default function LeftSidebar() {
                 onClick={(e) => { e.stopPropagation(); handlePinChat(chat.id, !!chat.is_pinned); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handlePinChat(chat.id, !!chat.is_pinned); } }}
               >
-                {chat.is_pinned ? '📌' : '📍'}
+                {chat.is_pinned ? <PinOff size={14} /> : <Pin size={14} />}
               </div>
             </button>
           );
