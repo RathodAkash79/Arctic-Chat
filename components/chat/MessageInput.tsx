@@ -26,20 +26,21 @@ interface Props {
 }
 
 const SLASH_COMMANDS = [
-    { cmd: '/ban', usage: '/ban @user [reason]', desc: 'Ban user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }] },
-    { cmd: '/unban', usage: '/unban @user', desc: 'Unban user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }] },
-    { cmd: '/to', usage: '/to @user [mins] [reason]', desc: 'Timeout user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'duration', placeholder: 'mins' }, { name: 'reason', placeholder: 'Optional reason' }] },
-    { cmd: '/untimeout', usage: '/untimeout @user', desc: 'Remove timeout (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }] },
-    { cmd: '/mute', usage: '/mute @user [reason]', desc: 'Mute user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }] },
-    { cmd: '/unmute', usage: '/unmute @user', desc: 'Unmute user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }] },
-    { cmd: '/kick', usage: '/kick @user [reason]', desc: 'Kick user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }] },
-    { cmd: '/warn', usage: '/warn @user [reason]', desc: 'Warn user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Reason' }] },
-    { cmd: '/announce', usage: '/announce [message]', desc: 'Send announcement (admin/owner)', fields: [{ name: 'message', placeholder: 'Your announcement...' }] },
-    { cmd: '/promote', usage: '/promote @user', desc: 'Make admin (owner only)', fields: [{ name: 'user', placeholder: '@username' }] },
-    { cmd: '/demote', usage: '/demote @user', desc: 'Remove admin (owner only)', fields: [{ name: 'user', placeholder: '@username' }] },
-    { cmd: '/slowmode', usage: '/slowmode [seconds]', desc: 'Set slowmode (owner only)', fields: [{ name: 'seconds', placeholder: '0 to disable' }] },
-    { cmd: '/nuke', usage: '/nuke', desc: 'Delete ALL messages (owner only)', fields: [] },
-    { cmd: '/help', usage: '/help', desc: 'Show all commands', fields: [] },
+    { cmd: '/ban', usage: '/ban @user [reason]', desc: 'Ban user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }], requiredRole: 'admin' },
+    { cmd: '/unban', usage: '/unban @user', desc: 'Unban user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }], requiredRole: 'admin' },
+    { cmd: '/to', usage: '/to @user [mins] [reason]', desc: 'Timeout user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'duration', placeholder: 'mins' }, { name: 'reason', placeholder: 'Optional reason' }], requiredRole: 'admin' },
+    { cmd: '/untimeout', usage: '/untimeout @user', desc: 'Remove timeout (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }], requiredRole: 'admin' },
+    { cmd: '/mute', usage: '/mute @user [reason]', desc: 'Mute user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }], requiredRole: 'admin' },
+    { cmd: '/unmute', usage: '/unmute @user', desc: 'Unmute user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }], requiredRole: 'admin' },
+    { cmd: '/kick', usage: '/kick @user [reason]', desc: 'Kick user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Optional reason' }], requiredRole: 'admin' },
+    { cmd: '/warn', usage: '/warn @user [reason]', desc: 'Warn user (admin/owner)', fields: [{ name: 'user', placeholder: '@username' }, { name: 'reason', placeholder: 'Reason' }], requiredRole: 'admin' },
+    { cmd: '/announce', usage: '/announce [message]', desc: 'Send announcement (admin/owner)', fields: [{ name: 'message', placeholder: 'Your announcement...' }], requiredRole: 'admin' },
+    { cmd: '/promote', usage: '/promote @user', desc: 'Make admin (owner only)', fields: [{ name: 'user', placeholder: '@username' }], requiredRole: 'owner' },
+    { cmd: '/demote', usage: '/demote @user', desc: 'Remove admin (owner only)', fields: [{ name: 'user', placeholder: '@username' }], requiredRole: 'owner' },
+    { cmd: '/slowmode', usage: '/slowmode [seconds]', desc: 'Set slowmode (owner only)', fields: [{ name: 'seconds', placeholder: '0 to disable' }], requiredRole: 'owner' },
+    { cmd: '/nuke', usage: '/nuke', desc: 'Delete ALL messages (owner only)', fields: [], requiredRole: 'owner' },
+    { cmd: '/help', usage: '/help', desc: 'Show all commands', fields: [], requiredRole: 'member' },
+    { cmd: '/nick', usage: '/nick [name]', desc: 'Set group nickname', fields: [{ name: 'name', placeholder: 'Optional' }], requiredRole: 'member' },
 ];
 
 const TASK_COMMAND = { cmd: '/task', usage: '/task @user description', desc: 'Assign task', fields: [{ name: 'user', placeholder: '@username' }, { name: 'description', placeholder: 'Task description' }] };
@@ -244,7 +245,7 @@ export default function MessageInput({
         setText('');
         setShowSlashPopup(false);
 
-        if (cmdDef.cmd === '/help') {
+        if (cmdDef.cmd === '/help' || cmdDef.cmd === '/nuke') {
             handleSendOverride(cmdDef.cmd);
             return;
         }
@@ -308,7 +309,7 @@ export default function MessageInput({
         }
 
         // Slash command
-        if (trimmed.startsWith('/') && isAdmin && chatId && currentUser) {
+        if (trimmed.startsWith('/') && chatId && currentUser) {
             const result = await executeSlashCommand(
                 trimmed,
                 chatId,
@@ -357,8 +358,8 @@ export default function MessageInput({
     const handleSendBtn = async () => {
         let finalRawInput = text.trim();
 
-        if (activeCommand && activeCommand !== '/help') {
-            if (!commandArgs[0]) {
+        if (activeCommand && activeCommand !== '/help' && activeCommand !== '/nuke') {
+            if (activeCmdDef && activeCmdDef.fields.length > 0 && !commandArgs[0]) {
                 commandInputRefs.current[0]?.focus();
                 return;
             }
@@ -506,8 +507,16 @@ export default function MessageInput({
         setMediaInfo('');
     };
 
-    const canSend = ((activeCommand && commandArgs[0]) || text.trim() || mediaFile) && !disabled && !uploading && !compressing;
-    const filteredSlashCmds = (isWorkspace ? [TASK_COMMAND] : SLASH_COMMANDS).filter((c) => c.cmd.includes(slashFilter));
+    const canSend = ((activeCommand && (activeCmdDef?.fields.length === 0 || commandArgs[0] || (activeCommand === '/nick'))) || text.trim() || mediaFile) && !disabled && !uploading && !compressing;
+
+    // Filter slash commands based on role
+    const filteredSlashCmds = (isWorkspace ? [TASK_COMMAND] : SLASH_COMMANDS).filter((c) => {
+        if (!c.cmd.includes(slashFilter)) return false;
+        if (isWorkspace) return true;
+        if ((c as any).requiredRole === 'owner') return callerGroupRole === 'owner';
+        if ((c as any).requiredRole === 'admin') return callerGroupRole === 'owner' || callerGroupRole === 'admin';
+        return true; // member level commands
+    });
 
     return (
         <div className={`${styles.inputBar} ${editingMessage ? styles.editMode : ''}`}>
@@ -556,7 +565,7 @@ export default function MessageInput({
             )}
 
             {/* Slash command popup */}
-            {showSlashPopup && filteredSlashCmds.length > 0 && (isAdmin || isWorkspace) && (
+            {showSlashPopup && filteredSlashCmds.length > 0 && (
                 <div className={styles.slashPopup}>
                     {filteredSlashCmds.map((c) => (
                         <button

@@ -22,7 +22,7 @@ export function useChats() {
         // Step 1 & 2 in parallel with Step 3
         // We fetch the chat details (via inner join to confirm membership) 
         // and all participants (via RPC) simultaneously.
-        interface RpcParticipant { chat_id: string; user_id: string; group_role: string; joined_at: string }
+        interface RpcParticipant { chat_id: string; user_id: string; group_role: string; joined_at: string; nickname?: string }
 
         const [chatsRes, participantsRes] = await Promise.all([
             supabase
@@ -64,6 +64,7 @@ export function useChats() {
                     user_id: p.user_id,
                     group_role: p.group_role as ChatParticipant['group_role'],
                     joined_at: p.joined_at,
+                    nickname: p.nickname,
                     user: usersMap.get(p.user_id),
                 }));
 

@@ -83,6 +83,7 @@ export interface ChatParticipant {
   joined_at?: string;
   user?: User;
   is_pinned?: boolean;
+  nickname?: string | null;
 }
 
 // Mention in a message

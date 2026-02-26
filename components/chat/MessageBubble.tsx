@@ -97,7 +97,7 @@ export default function MessageBubble({
         return currentChat?.participants?.find((p) => p.user_id === message.sender_id) || null;
     }, [isGroup, isOwn, showName, currentChat, message.sender_id]);
 
-    const senderName = senderParticipant?.user?.display_name || 'User';
+    const senderName = senderParticipant?.nickname || senderParticipant?.user?.display_name || 'User';
 
     // 15-minute window check (updated reactively would need a timer, but useMemo is ok for render)
     const isWithin15Min = useMemo(
@@ -371,9 +371,12 @@ export default function MessageBubble({
                         <span className={styles.replyAuthor}>
                             {replySource.sender_id === currentUser?.id
                                 ? 'You'
-                                : currentChat?.participants?.find(
-                                    (p) => p.user_id === replySource.sender_id
-                                )?.user?.display_name || 'User'}
+                                : (() => {
+                                    const p = currentChat?.participants?.find(
+                                        (pt) => pt.user_id === replySource.sender_id
+                                    );
+                                    return p?.nickname || p?.user?.display_name || 'User';
+                                })()}
                         </span>
                         <span className={styles.replyText}>
                             {replySource.media_url ? '📷 Photo' : replySourceText || '...'}

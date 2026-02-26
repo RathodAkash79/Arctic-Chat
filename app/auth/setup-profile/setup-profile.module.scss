@@ -92,13 +92,24 @@
   justify-content: center;
   color: var(--text-tertiary);
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   cursor: pointer;
   position: relative;
 
   &:hover {
     border-color: var(--accent-primary);
     box-shadow: 0 0 24px rgba(14, 165, 233, 0.2);
+  }
+
+  &.dragging {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 32px rgba(14, 165, 233, 0.4);
+    transform: scale(1.05);
+
+    .avatarOverlay {
+      opacity: 1;
+      background: rgba(14, 165, 233, 0.6);
+    }
   }
 
   img {
@@ -116,12 +127,24 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
   border-radius: 50%;
   color: white;
 
   .avatarPreview:hover & {
     opacity: 1;
+  }
+
+  .overlayContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    span {
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
   }
 }
 

@@ -27,6 +27,7 @@ export interface CommandResult {
  * /demote @user  — OWNER ONLY
  * /slowmode [secs] – OWNER ONLY
  * /nuke        — OWNER ONLY (wipes all group messages + S3 objects)
+ * /nick [name] — all members (sets nickname for the group)
  */
 
 // ── Low-level RPC helper ────────────────────────────────────────────────────
@@ -111,6 +112,10 @@ export async function executeSlashCommand(
         // ── Help ────────────────────────────────────────────────
         case 'help':
             return handleHelp(isAdminOrOwner, isOwner);
+
+        // ── Nick ────────────────────────────────────────────────
+        case 'nick':
+            return handleNick(chatId, remaining);
 
         // ── Announce ────────────────────────────────────────────
         case 'announce':
@@ -357,6 +362,7 @@ function handleHelp(isAdmin: boolean, isOwner: boolean): CommandResult {
 
     lines.push(`\n**📣 Everyone**`);
     lines.push(`• \`/help\` — Show this list`);
+    lines.push(`• \`/nick [name]\` — Set a nickname in this group (empty to reset)`);
 
     if (isAdmin || isOwner) {
         lines.push(`\n**🛡️ Admin & Owner**`);
@@ -387,6 +393,29 @@ function handleHelp(isAdmin: boolean, isOwner: boolean): CommandResult {
 }
 
 // ── Task command (workspace chats) ─────────────────────────────────────────
+
+async function handleNick(chatId: string, nickname: string): Promise<CommandResult> {
+    const { error } = await supabase.rpc('set_group_nickname', {
+        p_chat_id: chatId,
+        p_nickname: nickname || null
+    });
+
+    if (error) return { success: false, message: `Failed to set nickname: ${error.message}` };
+
+    if (!nickname) {
+        return {
+            success: true,
+            message: 'Nickname reset.',
+            systemText: '🏷️ Nickname has been reset to default display name.'
+        };
+    }
+
+    return {
+        success: true,
+        message: `Nickname set to ${nickname}.`,
+        systemText: `🏷️ Nickname has been set to **${nickname}**.`
+    };
+}
 
 export async function executeTaskCommand(
     rawInput: string,

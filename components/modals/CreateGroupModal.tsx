@@ -30,6 +30,7 @@ export default function CreateGroupModal({ onClose }: Props) {
     const [groupAvatar, setGroupAvatar] = useState<string | null>(null);
     const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
     const [creating, setCreating] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const close = () => onClose();
@@ -67,10 +68,11 @@ export default function CreateGroupModal({ onClose }: Props) {
         );
     };
 
-    // Avatar upload
-    const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const processGroupAvatar = async (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file.');
+            return;
+        }
         try {
             const { blob, previewUrl } = await compressImage(file, false);
             setGroupAvatar(previewUrl);
@@ -78,7 +80,33 @@ export default function CreateGroupModal({ onClose }: Props) {
         } catch {
             alert('Image compression failed');
         }
+    };
+
+    // Avatar upload
+    const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) await processGroupAvatar(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            await processGroupAvatar(file);
+        }
     };
 
     // Create the group
@@ -225,8 +253,11 @@ export default function CreateGroupModal({ onClose }: Props) {
                         <div className={styles.detailsForm}>
                             {/* Group Avatar */}
                             <div
-                                className={styles.groupAvatar}
+                                className={`${styles.groupAvatar} ${isDragging ? styles.dragging : ''}`}
                                 onClick={() => fileInputRef.current?.click()}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
                             >
                                 {groupAvatar ? (
                                     <img src={groupAvatar} alt="" />

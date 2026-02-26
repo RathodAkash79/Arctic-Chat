@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
 import { supabase } from '@/lib/supabase';
-import { X, Users, UserPlus, LogOut, MoreVertical, Shield, ShieldAlert, UserMinus, ShieldOff, Hammer, Ban } from 'lucide-react';
+import { X, Users, UserPlus, LogOut, MoreVertical, Shield, ShieldAlert, UserMinus, ShieldOff, Hammer, Ban, BarChart2, Image as ImageIcon, Link as LinkIcon, Calendar, MessageSquare } from 'lucide-react';
 import AddMemberModal from '../modals/AddMemberModal';
+import { resolveImageUrl } from '@/lib/utils';
+import { decryptMessage } from '@/lib/crypto';
 import styles from './RightPanel.module.scss';
 
 interface BannedUser {
@@ -18,6 +21,7 @@ interface BannedUser {
 }
 
 export default function RightPanel() {
+  const router = useRouter();
   const { currentUser, currentChat, setIsRightPanelOpen } = useAppStore();
   const { fetchChats } = useChats();
 
@@ -26,6 +30,13 @@ export default function RightPanel() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [banList, setBanList] = useState<BannedUser[]>([]);
   const [loadingBans, setLoadingBans] = useState(false);
+
+  // DM Tabs State
+  const [dmTab, setDmTab] = useState<'stats' | 'images' | 'links'>('stats');
+  const [dmStats, setDmStats] = useState({ msgCount: 0, firstDate: '' });
+  const [dmImages, setDmImages] = useState<any[]>([]);
+  const [dmLinks, setDmLinks] = useState<any[]>([]);
+  const [loadingDm, setLoadingDm] = useState(false);
 
   const isAdminOrOwner = useMemo(() => {
     if (!currentChat || !currentUser) return false;
@@ -55,8 +66,88 @@ export default function RightPanel() {
     }
   };
 
+  const fetchDmData = async () => {
+    if (!currentChat || currentChat.type !== 'dm') return;
+    setLoadingDm(true);
+    try {
+      // 1. Stats
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('chat_id', currentChat.id);
+
+      const { data: firstMsg } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('chat_id', currentChat.id)
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      setDmStats({
+        msgCount: count || 0,
+        firstDate: firstMsg?.[0]?.created_at || currentChat.created_at
+      });
+
+      // 2. Images
+      const { data: imgData } = await supabase
+        .from('messages')
+        .select('id, media_url, created_at, expires_at')
+        .eq('chat_id', currentChat.id)
+        .not('media_url', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (imgData) {
+        const now = Date.now();
+        const validImgs = imgData.filter(m => !m.expires_at || new Date(m.expires_at).getTime() > now);
+        setDmImages(validImgs);
+      } else {
+        setDmImages([]);
+      }
+
+      // 3. Links
+      const { data: allMsgs } = await supabase
+        .from('messages')
+        .select('id, text, link_preview, created_at')
+        .eq('chat_id', currentChat.id)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (allMsgs) {
+        const extractedLinks: any[] = [];
+        for (const msg of allMsgs) {
+          if (msg.link_preview && msg.link_preview.url) {
+            extractedLinks.push(msg);
+            continue;
+          }
+          if (!msg.text || msg.text === '[deleted]' || msg.is_deleted) continue;
+
+          try {
+            const dec = await decryptMessage(msg.text).catch(() => msg.text);
+            const urlMatch = dec.match(/(https?:\/\/[^\s]+)/g);
+            if (urlMatch) {
+              urlMatch.forEach((url: string) => {
+                extractedLinks.push({
+                  id: msg.id + url,
+                  created_at: msg.created_at,
+                  link_preview: { url, title: url, description: '' }
+                });
+              });
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setDmLinks(extractedLinks);
+      } else {
+        setDmLinks([]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setLoadingDm(false);
+  };
+
   useEffect(() => {
     fetchBanList();
+    if (currentChat?.type === 'dm') fetchDmData();
   }, [currentChat?.id, isAdminOrOwner]);
 
   const handleLeaveGroup = async () => {
@@ -72,6 +163,32 @@ export default function RightPanel() {
       console.error('Failed to leave:', err);
     }
     setLeaving(true);
+  };
+
+  const handleParticipantClick = async (targetUserId: string) => {
+    if (!currentUser || targetUserId === currentUser.id) return;
+
+    const existingLocal = useAppStore.getState().chats.find(
+      (c) => c.type === 'dm' && c.participants?.some((p) => p.user_id === targetUserId)
+    );
+    if (existingLocal) {
+      useAppStore.getState().setCurrentChat(existingLocal);
+      useAppStore.getState().setIsMobileChatOpen(true);
+      router.push(`/${existingLocal.id}`);
+      setIsRightPanelOpen(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_or_create_dm_chat_v2', { target_user_id: targetUserId });
+      if (error) throw error;
+      if (data) {
+        router.push(`/${data}`);
+        setIsRightPanelOpen(false);
+      }
+    } catch (err) {
+      console.error('Failed to open DM:', err);
+    }
   };
 
   const handleRoleChange = async (targetUserId: string, newRole: string) => {
@@ -169,8 +286,117 @@ export default function RightPanel() {
         )}
       </div>
 
+      {/* DM Tabs */}
+      {currentChat.type === 'dm' && (
+        <div className={styles.dmTabsContainer}>
+          <div className={styles.tabsHeader}>
+            <button
+              className={`${styles.tabBtn} ${dmTab === 'stats' ? styles.activeTab : ''}`}
+              onClick={() => setDmTab('stats')}
+            >
+              <BarChart2 size={16} /> Stats
+            </button>
+            <button
+              className={`${styles.tabBtn} ${dmTab === 'images' ? styles.activeTab : ''}`}
+              onClick={() => setDmTab('images')}
+            >
+              <ImageIcon size={16} /> Images
+            </button>
+            <button
+              className={`${styles.tabBtn} ${dmTab === 'links' ? styles.activeTab : ''}`}
+              onClick={() => setDmTab('links')}
+            >
+              <LinkIcon size={16} /> Links
+            </button>
+          </div>
+
+          <div className={styles.tabContent}>
+            {loadingDm ? (
+              <div className={styles.loadingSmall}>Loading...</div>
+            ) : (
+              <>
+                {dmTab === 'stats' && (
+                  <div className={styles.statsTab}>
+                    <div className={styles.statBox}>
+                      <MessageSquare size={18} />
+                      <div className={styles.statInfo}>
+                        <span className={styles.statValue}>{dmStats.msgCount}</span>
+                        <span className={styles.statLabel}>Total Messages</span>
+                      </div>
+                    </div>
+                    <div className={styles.statBox}>
+                      <Calendar size={18} />
+                      <div className={styles.statInfo}>
+                        <span className={styles.statValue}>
+                          {new Date(dmStats.firstDate).toLocaleDateString()}
+                        </span>
+                        <span className={styles.statLabel}>Chat Started</span>
+                      </div>
+                    </div>
+                    <div className={styles.statBox}>
+                      <Calendar size={18} />
+                      <div className={styles.statInfo}>
+                        <span className={styles.statValue}>
+                          {new Date(currentChat.dm_user?.created_at || '').toLocaleDateString()}
+                        </span>
+                        <span className={styles.statLabel}>Joined ArcticChat</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {dmTab === 'images' && (
+                  <div className={styles.imagesTab}>
+                    <div className={styles.tabSubtitle}>
+                      {dmImages.length} Image{dmImages.length !== 1 ? 's' : ''}
+                    </div>
+                    <div className={styles.imageGrid}>
+                      {dmImages.map((img) => (
+                        <a
+                          key={img.id}
+                          href={resolveImageUrl(img.media_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.imageGridItem}
+                        >
+                          <img src={resolveImageUrl(img.media_url)} alt="Shared media" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {dmTab === 'links' && (
+                  <div className={styles.linksTab}>
+                    <div className={styles.tabSubtitle}>
+                      {dmLinks.length} Link{dmLinks.length !== 1 ? 's' : ''}
+                    </div>
+                    <div className={styles.linkList}>
+                      {dmLinks.map((link) => (
+                        <a
+                          key={link.id}
+                          href={link.link_preview.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.linkItem}
+                        >
+                          <div className={styles.linkInfo}>
+                            <span className={styles.linkTitle}>{link.link_preview.title || link.link_preview.url}</span>
+                            <span className={styles.linkDesc}>{link.link_preview.description || 'No description preview available'}</span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Participants */}
-      {currentChat.participants && currentChat.participants.length > 0 && (
+      {currentChat.type === 'group' && currentChat.participants && (
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <div className={styles.sectionTitle}>
@@ -189,7 +415,12 @@ export default function RightPanel() {
           </div>
           <div className={styles.participantList}>
             {currentChat.participants.map((p) => (
-              <div key={p.user_id} className={styles.participantItem}>
+              <div
+                key={p.user_id}
+                className={styles.participantItem}
+                onClick={() => handleParticipantClick(p.user_id)}
+                style={{ cursor: p.user_id !== currentUser?.id ? 'pointer' : 'default' }}
+              >
                 <div className={styles.participantAvatar}>
                   {p.user?.pfp_url ? (
                     <img src={p.user.pfp_url} alt="" />

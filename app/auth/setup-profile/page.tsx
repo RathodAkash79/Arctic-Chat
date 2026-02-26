@@ -19,6 +19,7 @@ export default function SetupProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -46,10 +47,11 @@ export default function SetupProfilePage() {
     checkAuth();
   }, [router]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file.');
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be less than 5MB.');
       return;
@@ -64,6 +66,29 @@ export default function SetupProfilePage() {
       setPfpPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleAvatarClick = () => {
@@ -173,8 +198,11 @@ export default function SetupProfilePage() {
         {/* Avatar Upload */}
         <div className={styles.avatarSection}>
           <div
-            className={styles.avatarPreview}
+            className={`${styles.avatarPreview} ${isDragging ? styles.dragging : ''}`}
             onClick={handleAvatarClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             role="button"
             tabIndex={0}
             aria-label="Upload profile picture"
@@ -185,7 +213,10 @@ export default function SetupProfilePage() {
               <UserIcon size={44} strokeWidth={1.2} />
             )}
             <div className={styles.avatarOverlay}>
-              <Camera size={24} />
+              <div className={styles.overlayContent}>
+                <Camera size={24} />
+                <span>{isDragging ? 'Drop Image!' : ''}</span>
+              </div>
             </div>
           </div>
           <input
