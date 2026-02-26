@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
@@ -8,6 +8,19 @@ import { compressImage } from '@/lib/imageCompression';
 import { X, Search as SearchIcon, Users, Camera, Check } from 'lucide-react';
 import type { User } from '@/types';
 import styles from './CreateGroupModal.module.scss';
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+    });
+};
+
+const base64ToBlob = async (base64: string): Promise<Blob> => {
+    const res = await fetch(base64);
+    return res.blob();
+};
 
 interface Props {
     onClose: () => void;
@@ -28,10 +41,40 @@ export default function CreateGroupModal({ onClose }: Props) {
     const [groupName, setGroupName] = useState('');
     const [groupDesc, setGroupDesc] = useState('');
     const [groupAvatar, setGroupAvatar] = useState<string | null>(null);
-    const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
     const [creating, setCreating] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load from localStorage on mount
+    useEffect(() => {
+        try {
+            const savedStateStr = localStorage.getItem('arctic_chat_create_group_state');
+            if (savedStateStr) {
+                const savedState = JSON.parse(savedStateStr);
+                if (savedState.groupName) setGroupName(savedState.groupName);
+                if (savedState.groupDesc) setGroupDesc(savedState.groupDesc);
+                if (savedState.groupAvatar) setGroupAvatar(savedState.groupAvatar);
+                if (savedState.selectedMembers) setSelectedMembers(savedState.selectedMembers);
+            }
+        } catch (e) {
+            console.error('Failed to parse saved group state from localStorage', e);
+        }
+    }, []);
+
+    // Save to localStorage when state changes
+    useEffect(() => {
+        try {
+            const stateToSave = {
+                groupName,
+                groupDesc,
+                groupAvatar, // saved as Base64 string
+                selectedMembers
+            };
+            localStorage.setItem('arctic_chat_create_group_state', JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error('Failed to save group state to localStorage', e);
+        }
+    }, [groupName, groupDesc, groupAvatar, selectedMembers]);
 
     const close = () => onClose();
 
@@ -74,9 +117,9 @@ export default function CreateGroupModal({ onClose }: Props) {
             return;
         }
         try {
-            const { blob, previewUrl } = await compressImage(file, false);
-            setGroupAvatar(previewUrl);
-            setAvatarBlob(blob);
+            const { blob } = await compressImage(file, false);
+            const base64 = await blobToBase64(blob);
+            setGroupAvatar(base64);
         } catch {
             alert('Image compression failed');
         }
@@ -117,7 +160,8 @@ export default function CreateGroupModal({ onClose }: Props) {
         try {
             // Upload avatar if set
             let pfpUrl: string | null = null;
-            if (avatarBlob) {
+            if (groupAvatar) {
+                const avatarBlob = await base64ToBlob(groupAvatar);
                 const formData = new FormData();
                 formData.append('file', avatarBlob, 'group-avatar.webp');
                 formData.append('purpose', 'profile');
@@ -145,6 +189,10 @@ export default function CreateGroupModal({ onClose }: Props) {
             await fetchChats();
             const chats = useAppStore.getState().chats;
             const newChat = chats.find((c) => c.id === chatId);
+
+            // Clear localStorage upon successful creation
+            localStorage.removeItem('arctic_chat_create_group_state');
+
             if (newChat) openChat(newChat);
 
             close();

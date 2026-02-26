@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/store/useAppStore';
 import { useChats } from '@/hooks/useChats';
@@ -54,6 +54,18 @@ export default function LeftSidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedGroupState = localStorage.getItem('arctic_chat_create_group_state');
+      // If there is valid state, auto-open the modal
+      if (savedGroupState) {
+        setIsCreateGroupOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const filteredChats = useMemo(() => {
     const filtered = !searchQuery.trim() ? chats : chats.filter((chat) => {

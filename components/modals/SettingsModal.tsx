@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { supabase } from '@/lib/supabase';
 import { encryptMessage } from '@/lib/crypto';
+import { compressImage } from '@/lib/imageCompression';
 import {
     X,
     User,
@@ -15,9 +16,23 @@ import {
     Monitor,
     Check,
     Loader2,
+    Camera,
 } from 'lucide-react';
 import type { Theme } from '@/types';
 import styles from './SettingsModal.module.scss';
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+    });
+};
+
+const base64ToBlob = async (base64: string): Promise<Blob> => {
+    const res = await fetch(base64);
+    return res.blob();
+};
 
 type Tab = 'profile' | 'security' | 'appearance' | 'feedback';
 
@@ -27,6 +42,9 @@ export default function SettingsModal() {
 
     // Profile tab state
     const [displayName, setDisplayName] = useState(currentUser?.display_name || '');
+    const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [savingName, setSavingName] = useState(false);
     const [nameSaved, setNameSaved] = useState(false);
     const [nameError, setNameError] = useState('');
@@ -41,9 +59,54 @@ export default function SettingsModal() {
     const [feedbackSent, setFeedbackSent] = useState(false);
     const [feedbackError, setFeedbackError] = useState('');
 
-    const handleSaveName = useCallback(async () => {
+    const processAvatar = async (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file.');
+            return;
+        }
+        try {
+            const { blob } = await compressImage(file, false);
+            const base64 = await blobToBase64(blob);
+            setAvatarBase64(base64);
+        } catch {
+            alert('Image compression failed');
+        }
+    };
+
+    const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) await processAvatar(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            await processAvatar(file);
+        }
+    };
+
+    const handleSaveProfile = useCallback(async () => {
         if (!displayName.trim() || !currentUser) return;
-        if (displayName.trim() === currentUser.display_name) {
+
+        let hasChanges = false;
+        if (displayName.trim() !== currentUser.display_name) hasChanges = true;
+        if (avatarBase64) hasChanges = true;
+
+        if (!hasChanges) {
             setNameSaved(true);
             setTimeout(() => setNameSaved(false), 2000);
             return;
@@ -52,21 +115,46 @@ export default function SettingsModal() {
         setSavingName(true);
         setNameError('');
 
+        let pfpUrl = currentUser.pfp_url;
+
+        if (avatarBase64) {
+            try {
+                const avatarBlob = await base64ToBlob(avatarBase64);
+                const formData = new FormData();
+                formData.append('file', avatarBlob, 'profile-avatar.webp');
+                formData.append('purpose', 'profile');
+
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.url) {
+                    pfpUrl = data.url;
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (err) {
+                console.error("Failed to upload avatar:", err);
+                setNameError('Failed to upload avatar');
+                setSavingName(false);
+                return;
+            }
+        }
+
         const { error } = await supabase
             .from('users')
-            .update({ display_name: displayName.trim() })
+            .update({ display_name: displayName.trim(), pfp_url: pfpUrl })
             .eq('id', currentUser.id);
 
         setSavingName(false);
 
         if (error) {
-            setNameError('Failed to update name. Please try again.');
+            setNameError('Failed to update profile. Please try again.');
         } else {
-            setCurrentUser({ ...currentUser, display_name: displayName.trim() });
+            setCurrentUser({ ...currentUser, display_name: displayName.trim(), pfp_url: pfpUrl });
+            setAvatarBase64(null);
             setNameSaved(true);
             setTimeout(() => setNameSaved(false), 2000);
         }
-    }, [displayName, currentUser, setCurrentUser]);
+    }, [displayName, avatarBase64, currentUser, setCurrentUser]);
 
     const handlePasswordReset = useCallback(async () => {
         if (!currentUser?.email) return;
@@ -145,12 +233,39 @@ export default function SettingsModal() {
                             <div className={styles.section}>
                                 <h3 className={styles.sectionTitle}>Profile</h3>
 
-                                <div className={styles.field}>
-                                    <label className={styles.label}>Email</label>
-                                    <div className={styles.readonlyField}>
-                                        {currentUser?.email}
+                                <div className={styles.profileHeader}>
+                                    <div
+                                        className={`${styles.profileAvatar} ${isDragging ? styles.dragging : ''}`}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                    >
+                                        {avatarBase64 || currentUser?.pfp_url ? (
+                                            <img src={avatarBase64 || currentUser?.pfp_url} alt="" />
+                                        ) : (
+                                            <Camera size={24} />
+                                        )}
+                                        <div className={styles.avatarOverlay}>
+                                            <Camera size={20} />
+                                        </div>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleAvatarSelect}
+                                            style={{ display: 'none' }}
+                                        />
                                     </div>
-                                    <span className={styles.hint}>Email cannot be changed here.</span>
+                                    <div className={styles.profileHeaderInfo}>
+                                        <div className={styles.field} style={{ marginBottom: 0 }}>
+                                            <label className={styles.label}>Email</label>
+                                            <div className={styles.readonlyField}>
+                                                {currentUser?.email}
+                                            </div>
+                                            <span className={styles.hint}>Email cannot be changed here.</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className={styles.field}>
@@ -166,12 +281,12 @@ export default function SettingsModal() {
                                             onChange={(e) => setDisplayName(e.target.value)}
                                             placeholder="Your display name"
                                             maxLength={32}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveProfile()}
                                         />
                                         <button
                                             className={`${styles.saveBtn} ${nameSaved ? styles.saveBtnSuccess : ''}`}
-                                            onClick={handleSaveName}
-                                            disabled={savingName || !displayName.trim()}
+                                            onClick={handleSaveProfile}
+                                            disabled={savingName || !displayName.trim() || (displayName.trim() === currentUser?.display_name && !avatarBase64)}
                                         >
                                             {savingName ? (
                                                 <Loader2 size={16} className={styles.spin} />
